@@ -51,6 +51,9 @@
 #define SPI5_BASE_ADDR	0x40015000U
 
 /* APB1 peripherals */
+#define I2C3_BASE_ADDR  0x40005C00U
+#define I2C2_BASE_ADDR	0x40005800U
+#define I2C1_BASE_ADDR 	0x40005400U
 #define UART2_BASE_ADDR	0x40004400U
 #define TIM2_BASE_ADDR	0x40000000U
 #define	TIM3_BASE_ADDR	0x40000400U
@@ -322,7 +325,7 @@ typedef struct{
 	volatile uint8_t _IPR[240]; 	//0xE000E400 (Interrupt Priority Reg 1 byte each)
 }NVIC_t;
 
-/*@brief	SPI Peripheral Register Map */
+/* @brief	SPI Peripheral Register Map */
 typedef struct{
 	volatile uint32_t SPI_CR1;
 	volatile uint32_t SPI_CR2;
@@ -334,6 +337,20 @@ typedef struct{
 	volatile uint32_t SPI_I2S_CFGR;
 	volatile uint32_t SPI_I2S_PR;
 }spiRegOffset_t;
+
+/* @brief	I2C Peripheral Register Map*/
+typedef struct{
+	volatile uint32_t I2C_CR1;
+	volatile uint32_t I2C_CR2;
+	volatile uint32_t I2C_OAR1;
+	volatile uint32_t I2C_OAR2;
+	volatile uint32_t I2C_DR;
+	volatile uint32_t I2C_SR1;
+	volatile uint32_t I2C_SR2;
+	volatile uint32_t I2C_CCR;
+	volatile uint32_t I2C_TRISE;
+	volatile uint32_t I2C_FLTR;
+}i2cRegOffset_t;
 
 /*
  * ----------------------------------------------------
@@ -375,6 +392,10 @@ typedef struct{
 #define SPI3_REG	((volatile spiRegOffset_t*)SPI3_BASE_ADDR)
 #define SPI4_REG	((volatile spiRegOffset_t*)SPI4_BASE_ADDR)
 #define SPI5_REG	((volatile spiRegOffset_t*)SPI5_BASE_ADDR)
+
+#define I2C1_REG	((volatile i2cRegOffset_t*)I2C1_BASE_ADDR)
+#define I2C2_REG	((volatile i2cRegOffset_t*)I2C2_BASE_ADDR)
+#define I2C3_REG	((volatile i2cRegOffset_t*)I2C3_BASE_ADDR)
 
 /*
  * ----------------------------------------------------
@@ -420,5 +441,9 @@ typedef struct{
 #define SPI3_GET_REG(regOffset) (&(SPI3_REG -> regOffset))
 #define SPI4_GET_REG(regOffset) (&(SPI4_REG -> regOffset))
 #define SPI5_GET_REG(regOffset) (&(SPI5_REG -> regOffset))
+
+#define I2C1_GET_REG(regOffset) (&(I2C1_REG -> regOffset))
+#define I2C2_GET_REG(regOffset) (&(I2C2_REG -> regOffset))
+#define I2C3_GET_REG(regOffset) (&(I2C3_REG -> regOffset))
 
 #endif /* INC_STM32PERIPHERALADDR_H_ */

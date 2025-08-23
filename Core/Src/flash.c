@@ -37,7 +37,6 @@ __attribute__((section(".RamConst")))volatile uint32_t* const flashRegLookupTabl
 };
 
 
-
 /*
  * @brief	A lookup table of **valid-bit masks** for every FLASH register
  * 			The array is indexed by 'FLASH_REG_COUNT'
