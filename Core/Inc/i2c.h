@@ -15,6 +15,15 @@
 #include "stm32PeripheralAddr.h"
 #include "gpioWriteRead.h"
 
+#define SR2_BUSY_Pos		1u
+#define SR1_SB_Pos 			0u
+#define SR1_ADDR_Pos		1u
+#define SR1_BTF_Pos			2u
+#define	SR1_TXE_Pos			7u
+#define	SR1_AF_Pos			10u
+#define	CR1_START_Pos		8u
+#define	CR1_STOP_Pos		9u
+
 typedef enum{
 	I2C_CR1,
 	I2C_CR2,
