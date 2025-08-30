@@ -12,9 +12,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "stm32f4xx_hal.h"
 #include "gpioWriteRead.h"
 #include "stm32PeripheralAddr.h"
 #include "rcc.h"
+
 
 typedef enum{
 	LED_GREEN = 12, //Pin 12

@@ -7,6 +7,7 @@
 #include "led.h"
 
 void ledGreenInit(){
+	__HAL_RCC_GPIOA_CLK_ENABLE();
 	my_RCC_GPIOD_CLK_ENABLE();
 	writePin(LED_GREEN, my_GPIOD, MODER, OUTPUT_MODE);
 }
