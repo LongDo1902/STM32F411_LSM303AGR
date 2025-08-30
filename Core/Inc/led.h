@@ -34,6 +34,7 @@ void ledGreenInit();
 void ledOrangeInit();
 void ledRedInit();
 void ledBlueInit();
+void ledsInit();
 
 void ledControl(LED_Color_t ledColor, LED_State_t on_off);
 

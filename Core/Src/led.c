@@ -7,24 +7,30 @@
 #include "led.h"
 
 void ledGreenInit(){
-	__HAL_RCC_GPIOA_CLK_ENABLE();
-	my_RCC_GPIOD_CLK_ENABLE();
+	Enable_GPIO_Clock(my_GPIOD);
 	writePin(LED_GREEN, my_GPIOD, MODER, OUTPUT_MODE);
 }
 
 void ledOrangeInit(){
-	my_RCC_GPIOD_CLK_ENABLE();
+	Enable_GPIO_Clock(my_GPIOD);
 	writePin(LED_ORANGE, my_GPIOD, MODER, OUTPUT_MODE);
 }
 
 void ledRedInit(){
-	my_RCC_GPIOD_CLK_ENABLE();
+	Enable_GPIO_Clock(my_GPIOD);
 	writePin(LED_RED, my_GPIOD, MODER, OUTPUT_MODE);
 }
 
 void ledBlueInit(){
-	my_RCC_GPIOD_CLK_ENABLE();
+	Enable_GPIO_Clock(my_GPIOD);
 	writePin(LED_BLUE, my_GPIOD, MODER, OUTPUT_MODE);
+}
+
+void ledsInit(){
+	ledGreenInit();
+	ledOrangeInit();
+	ledRedInit();
+	ledBlueInit();
 }
 
 void ledControl(LED_Color_t ledColor, LED_State_t on_off){
