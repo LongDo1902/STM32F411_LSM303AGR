@@ -26,7 +26,7 @@
 #define LSM303AGR_WHO_AM_I_ACC_VAL	0x33U
 #define LSM303AGR_WHO_AM_I_MAG_VAL	0x40U
 
-/* Auto-increment bit (set MSB of register address for multi-byte ops) */
+/* Auto-increment bit (set MSB of register address for	 multi-byte ops) */
 #define LSM303AGR_ADDR_AUTO_INC		0x80U
 
 /*
@@ -152,7 +152,6 @@ bool lsm303agr_readMagRaw();
 bool lsm303agr_readTempRaw();
 
 #endif /* INC_LSM303AGR_H_ */
-
 
 
 

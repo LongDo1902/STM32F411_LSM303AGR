@@ -483,23 +483,30 @@ bool I2C_getCCR(I2C_CCR_Mode_t ccrMode,
 /* ========================================================================== */
 /*                           Register-Level I/O                                */
 /* ========================================================================== */
-
 /*
- * @brief Write one byte to a register of a 7-bit I2C slave.
+ * @brief Write a single byte to an 8-bit sub-register of a 7-bit I2C slave.
  *
  * Sequence:
- *  1) Wait BUSY=0
- *  2) START
- *  3) Send <SlaveAddr | Write>
- *  4) Abort on NACK
- *  5) Send sub-register address
- *  6) Send data byte
- *  7) STOP
+ * 		Wait until BUSY = 0
+ * 		START
+ * 		Send <SlaveAddr|W>, wait ADDR = 1 (Abort on AF/NACK)
+ * 		Clear ADDR by reading SR1 then SR2
+ * 		Send sub-register address (SUB) and wait for TXE/BTF (Abort on AF/NACK)
+ * 		Send data byte, wait TXE/BTF (Abort on AF/NACK)
+ * 		STOP
+ *
+ * @param	config			I2C bus/pin selection
+ * @param	slaveAddr		7-bit UNSHIFTED slave device address
+ * @param	slaveRegAddr	8-bit sub-register address written to (SUB)
+ * @param	value			Single data byte to write
+ *
+ * @Notes: This helper does not send multiple bytes. Please use I2C_writeBurst to send multiple bytes
  */
 bool I2C_writeReg8(I2C_GPIO_Config_t config,
                    uint8_t           slaveAddr,
                    uint8_t           slaveRegAddr,
                    uint8_t           value) {
+
     const I2C_Name_t i2cBus  = config.i2cBus;
     uint32_t         timeout = I2C_TIMEOUT_SHORT_US;
 
@@ -511,41 +518,126 @@ bool I2C_writeReg8(I2C_GPIO_Config_t config,
     if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_SB_Pos, timeout)) return false;
 
     /* Send 7-bit address + write bit (0) */
-    const uint8_t writeMode = 0u;
-    const uint8_t addrByte  = (uint8_t)((slaveAddr << 1) | (writeMode << 0));
+    const uint8_t addrByte  = (uint8_t)((slaveAddr << 1) | 0u);
     if (!writeI2C(i2cBus, I2C_DR, 0u, addrByte)) return false;
-
-    /* Check address phase; handle NACK */
-    if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_ADDR_Pos, timeout)) {
-        if ((readI2C(i2cBus, I2C_SR1, SR1_AF_Pos) & 1u) == 1u) {
-            (void)writeI2C(i2cBus, I2C_CR1, CR1_STOP_Pos, SET);   /* STOP */
-            (void)writeI2C(i2cBus, I2C_SR1, SR1_AF_Pos,  RESET);  /* Clear AF */
-        }
-        return false;
+    if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_ADDR_Pos, timeout)) return false;
+    if (!I2C_waitBitClear(i2cBus, I2C_SR1, SR1_AF_Pos, timeout)){
+    	(void)writeI2C(i2cBus, I2C_CR1, CR1_STOP_Pos, SET);
+    	(void)writeI2C(i2cBus, I2C_SR1, SR1_AF_Pos, RESET);
+    	return false;
     }
 
     /* Clear ADDR by SR1->SR2 read sequence */
-    (void)readI2C(i2cBus, I2C_SR1, 0u);
     (void)readI2C(i2cBus, I2C_SR2, 0u);
 
-    /* Send sub-register address */
+    /* Send sub-register address; wait BTF */
     if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_TXE_Pos, timeout)) return false;
     if (!writeI2C(i2cBus, I2C_DR, 0u, slaveRegAddr))            return false;
     if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_BTF_Pos, timeout)) return false;
-    if (!I2C_waitBitClear(i2cBus, I2C_SR1, SR1_AF_Pos, timeout)) return false;
+    if (!I2C_waitBitClear(i2cBus, I2C_SR1, SR1_AF_Pos, timeout)){
+    	(void)writeI2C(i2cBus, I2C_CR1, CR1_STOP_Pos, SET);
+    	(void)writeI2C(i2cBus, I2C_SR1, SR1_AF_Pos, RESET);
+    	return false;
+    }
 
     /* Send data byte */
     if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_TXE_Pos, timeout)) return false;
     if (!writeI2C(i2cBus, I2C_DR, 0u, value))                   return false;
     if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_BTF_Pos, timeout)) return false;
-    if (!I2C_waitBitClear(i2cBus, I2C_SR1, SR1_AF_Pos, timeout)) return false;
+    if (!I2C_waitBitClear(i2cBus, I2C_SR1, SR1_AF_Pos, timeout)){
+    	(void)writeI2C(i2cBus, I2C_CR1, CR1_STOP_Pos, SET);
+    	(void)writeI2C(i2cBus, I2C_SR1, SR1_AF_Pos, RESET);
+    	return false;
+    }
 
     /* STOP */
     if (!writeI2C(i2cBus, I2C_CR1, CR1_STOP_Pos, SET)) return false;
     return true;
 }
 
-/**
+/*
+ * @brief	Write multiple bytes starting at a sub-register (burst write)
+ *
+ * Sequence (naster)
+ * 		Wait untul BUSY = 0
+ * 		START
+ * 		Send <SlaveAddr | W>, wait ADDR = 1 (Abort on AF/NACK)
+ * 		Clear ADDR by reading SR1 then SR2
+ * 		Send sub-register, typically with autoIncrement bit set, wait TXE/BTF (abort on AF/NACK)
+ * 		Send @p len data bytes back to back =, each waiting TXE/BTF
+ * 		STOP
+ *
+ * @param	config			I2C bus/pin selection
+ * @param	slaveAddr		7-bit UNSHIFTED slave address
+ * @param	startRegAddr	SUB-register address
+ * @param	autoIncreBitSet	Auto Increment bit/cmd of slave internal auto increment
+ * @param	dataBuf			Pointer to @p len bytes to transmit
+ * @param	len				Number of data bytes to write.
+ */
+bool I2C_writeBurst(I2C_GPIO_Config_t config,
+                    uint8_t           slaveAddr,
+                    uint8_t           startRegAddr,
+					uint8_t 		  autoIncreBitSet,
+                    uint8_t*          dataBuf,
+					uint16_t		  len) {
+
+	if((len == 0u) | (dataBuf == NULL)) return false;
+
+    const I2C_Name_t i2cBus  = config.i2cBus;
+    uint32_t         timeout = I2C_TIMEOUT_SHORT_US;
+
+    /* Wait until the bus is free */
+    if (!I2C_waitBitClear(i2cBus, I2C_SR2, SR2_BUSY_Pos, timeout)) return false;
+
+    /* START condition */
+    if (!writeI2C(i2cBus, I2C_CR1, CR1_START_Pos, SET)) return false;
+    if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_SB_Pos, timeout)) return false;
+
+    /* Send 7-bit address + write bit (0) */
+    const uint8_t addrByte  = (uint8_t)((slaveAddr << 1) | 0u);
+    if (!writeI2C(i2cBus, I2C_DR, 0u, addrByte)) return false;
+    if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_ADDR_Pos, timeout)) return false;
+    if (!I2C_waitBitClear(i2cBus, I2C_SR1, SR1_AF_Pos, timeout)){
+    	(void)writeI2C(i2cBus, I2C_CR1, CR1_STOP_Pos, SET);
+    	(void)writeI2C(i2cBus, I2C_SR1, SR1_AF_Pos, RESET);
+    	return false;
+    }
+
+    /* Clear ADDR by SR1->SR2 read sequence */
+    (void)readI2C(i2cBus, I2C_SR2, 0u);
+
+    /* Send sub-register address; wait BTF */
+    uint8_t sentByte = (uint8_t)(startRegAddr | autoIncreBitSet);
+    if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_TXE_Pos, timeout)) return false;
+    if (!writeI2C(i2cBus, I2C_DR, 0u, sentByte))           		return false;
+    if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_BTF_Pos, timeout)) return false;
+    if (!I2C_waitBitClear(i2cBus, I2C_SR1, SR1_AF_Pos, timeout)){
+    	(void)writeI2C(i2cBus, I2C_CR1, CR1_STOP_Pos, SET);
+    	(void)writeI2C(i2cBus, I2C_SR1, SR1_AF_Pos, RESET);
+    	return false;
+    }
+
+    /* Send data byte */
+    for(uint32_t i = 0; i < len; i++){
+		if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_TXE_Pos, timeout)) return false;
+		if (!writeI2C(i2cBus, I2C_DR, 0u, dataBuf[i]))              return false;
+		if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_BTF_Pos, timeout)) return false;
+
+		/* If AF set -> abort */
+	    if (!I2C_waitBitClear(i2cBus, I2C_SR1, SR1_AF_Pos, timeout)){
+	    	(void)writeI2C(i2cBus, I2C_CR1, CR1_STOP_Pos, SET);
+	    	(void)writeI2C(i2cBus, I2C_SR1, SR1_AF_Pos, RESET);
+	    	return false;
+	    }
+    }
+
+    /* STOP */
+    if (!writeI2C(i2cBus, I2C_CR1, CR1_STOP_Pos, SET)) return false;
+    return true;
+}
+
+
+/*
  * @brief Read one byte from an I2C 8-bit sub-register.
  *
  * Sequence:
@@ -576,16 +668,23 @@ bool I2C_readReg8(I2C_GPIO_Config_t config,
     const uint8_t addrWrite = (uint8_t)((slaveAddr << 1) | 0u);
     if (!writeI2C(i2cBus, I2C_DR, 0u, addrWrite)) return false;
     if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_ADDR_Pos, timeout)) return false;
+    if (!I2C_waitBitClear(i2cBus, I2C_SR1, SR1_AF_Pos, timeout)){
+    	(void)writeI2C(i2cBus, I2C_CR1, CR1_STOP_Pos, SET);
+    	(void)writeI2C(i2cBus, I2C_SR1, SR1_AF_Pos, RESET);
+    	return false;
+    }
 
     /* Clear ADDR by completing SR1->SR2 read sequence */
     (void)readI2C(i2cBus, I2C_SR2, 0u);
 
-    /* Confirm no NACK (AF=0) */
-    if (!I2C_waitBitClear(i2cBus, I2C_SR1, SR1_AF_Pos, timeout)) return false;
-
     /* Send sub-register index; wait BTF */
     if (!writeI2C(i2cBus, I2C_DR, 0u, slaveRegAddr))            return false;
     if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_BTF_Pos, timeout)) return false;
+    if (!I2C_waitBitClear(i2cBus, I2C_SR1, SR1_AF_Pos, timeout)){
+    	(void)writeI2C(i2cBus, I2C_CR1, CR1_STOP_Pos, SET);
+    	(void)writeI2C(i2cBus, I2C_SR1, SR1_AF_Pos, RESET);
+    	return false;
+    }
 
     /* Repeated START; wait SB */
     if (!writeI2C(i2cBus, I2C_CR1, CR1_START_Pos, SET))         return false;
@@ -595,22 +694,100 @@ bool I2C_readReg8(I2C_GPIO_Config_t config,
     const uint8_t addrRead = (uint8_t)((slaveAddr << 1) | 1u);
     if (!writeI2C(i2cBus, I2C_DR, 0u, addrRead))                return false;
     if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_ADDR_Pos, timeout)) return false;
-
+    if (!I2C_waitBitClear(i2cBus, I2C_SR1, SR1_AF_Pos, timeout)){
+    	(void)writeI2C(i2cBus, I2C_CR1, CR1_STOP_Pos, SET);
+    	(void)writeI2C(i2cBus, I2C_SR1, SR1_AF_Pos, RESET);
+    	return false;
+    }
     /* Clear ADDR (finish by reading SR2) */
     (void)readI2C(i2cBus, I2C_SR2, 0u);
-
-    /* Confirm no NACK (AF=0) */
-    if (!I2C_waitBitClear(i2cBus, I2C_SR1, SR1_AF_Pos, timeout)) return false;
 
     /* Wait RXNE=1 then read DR */
     if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_RXNE_Pos, timeout)) return false;
     *outResult = (uint8_t)readI2C(i2cBus, I2C_DR, 0u);
 
     /* STOP to release bus */
-    if (!writeI2C(i2cBus, I2C_CR1, CR1_STOP_Pos, SET)) return false;
+    (void)writeI2C(i2cBus, I2C_SR1, SR1_AF_Pos, RESET);
+    (void)writeI2C(i2cBus, I2C_CR1, CR1_STOP_Pos, SET);
 
     return true;
 }
+
+bool I2C_readBurst(I2C_GPIO_Config_t config,
+				   uint8_t           slaveAddr,
+				   uint8_t           startRegAddr,
+				   uint8_t			 autoIncreBitSet,
+				   uint16_t			 len,
+				   uint8_t* 		 outResultBuf){
+    const I2C_Name_t i2cBus = config.i2cBus;
+    const uint32_t   timeout = I2C_TIMEOUT_SHORT_US;
+
+    /* Ensure bus is idle */
+    if (!I2C_waitBitClear(i2cBus, I2C_SR2, SR2_BUSY_Pos, timeout));
+
+    /* START then wait for SB */
+    if (!writeI2C(i2cBus, I2C_CR1, CR1_START_Pos, SET)) 		return false;
+    if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_SB_Pos, timeout)) 	return false;
+
+    /* Send <addr | write>, then wait ADDR=1 */
+    const uint8_t addrWrite = (uint8_t)((slaveAddr << 1) | 0u);
+    if (!writeI2C(i2cBus, I2C_DR, 0u, addrWrite)) 				 return false;
+    if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_ADDR_Pos, timeout)) return false;
+    if (!I2C_waitBitClear(i2cBus, I2C_SR1, SR1_AF_Pos, timeout)){
+    	(void)writeI2C(i2cBus, I2C_CR1, CR1_STOP_Pos, SET);
+    	(void)writeI2C(i2cBus, I2C_SR1, SR1_AF_Pos, RESET);
+    	return false;
+    }
+
+    /* Clear ADDR by completing SR1->SR2 read sequence */
+    (void)readI2C(i2cBus, I2C_SR2, 0u);
+
+    /* Send sub-register index; wait BTF */
+    const uint8_t sentByte = (uint8_t)(startRegAddr | autoIncreBitSet);
+    if (!writeI2C(i2cBus, I2C_DR, 0u, sentByte))            	return false;
+    if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_BTF_Pos, timeout)) return false;
+    if (!I2C_waitBitClear(i2cBus, I2C_SR1, SR1_AF_Pos, timeout)){
+    	(void)writeI2C(i2cBus, I2C_CR1, CR1_STOP_Pos, SET);
+    	(void)writeI2C(i2cBus, I2C_SR1, SR1_AF_Pos, RESET);
+    	return false;
+    }
+
+    /* Repeated START; wait SB */
+    if (!writeI2C(i2cBus, I2C_CR1, CR1_START_Pos, SET))         return false;
+    if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_SB_Pos, timeout))  return false;
+
+    /* Send <addr | read>, then wait ADDR=1 */
+    const uint8_t addrRead = (uint8_t)((slaveAddr << 1) | 1u);
+    if (!writeI2C(i2cBus, I2C_DR, 0u, addrRead))                 return false;
+    if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_ADDR_Pos, timeout)) return false;
+    if (!I2C_waitBitClear(i2cBus, I2C_SR1, SR1_AF_Pos, timeout)){
+    	(void)writeI2C(i2cBus, I2C_CR1, CR1_STOP_Pos, SET);
+    	(void)writeI2C(i2cBus, I2C_SR1, SR1_AF_Pos, RESET);
+    	return false;
+    }
+
+    (void)readI2C(i2cBus, I2C_SR2, 0u); /* Clear ADDR (finish by reading SR2) */
+
+	/* MAK (Master AK) all but last */
+	(void)writeI2C(i2cBus, I2C_CR1, CR1_ACK_Pos, SET);
+
+	bool last = false;
+
+    for(uint32_t i = 0; i < len; i++){
+    	if(i == (len - 1)) last = true;
+    	if(last){
+    		(void)writeI2C(i2cBus, I2C_CR1, CR1_ACK_Pos, RESET); //NMACK
+    		(void)writeI2C(i2cBus, I2C_CR1, CR1_STOP_Pos, SET); //STOP
+    	}
+
+		/* Wait RXNE=1 then read DR */
+		if (!I2C_waitBitSet(i2cBus, I2C_SR1, SR1_RXNE_Pos, timeout)) return false;
+		outResultBuf[i] = (uint8_t)readI2C(i2cBus, I2C_DR, 0u);
+    }
+
+    return true;
+}
+
 
 /* ========================================================================== */
 /*                               Initialization                                */

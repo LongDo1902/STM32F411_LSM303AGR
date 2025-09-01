@@ -16,7 +16,6 @@
 
 int _delay = 500;
 bool flag = false;
-
 int main(void)
 {
     HAL_Init();

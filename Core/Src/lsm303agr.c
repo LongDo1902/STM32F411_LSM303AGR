@@ -30,25 +30,34 @@ static const LSM303AGR_t lsm303agrConfig = {
 };
 
 /*
- * ==========================================================
- * 					INTERNAL HELPERS
- * ==========================================================
+ * ==================================================================
+ * 					INTERNAL HELPERS OF ACCELEROMETER
+ * ==================================================================
  */
-static inline bool writeAcc(const LSM303AGR_t* dev, uint8_t addrReg, uint8_t val){
-	return I2C_writeReg8(dev -> i2c, dev -> addrAcc, addrReg, val);
+static inline bool writeAcc(const LSM303AGR_t* dev, uint8_t addrReg, uint8_t value){
+	return I2C_writeReg8(dev -> i2c, dev -> addrAcc, addrReg, value);
 }
 
 static inline bool readAcc(const LSM303AGR_t* dev, uint8_t addrReg, uint8_t* outResult){
 	return I2C_readReg8(dev -> i2c, dev -> addrAcc, addrReg, outResult);
 }
 
-static inline bool writeMag(const LSM303AGR_t* dev, uint8_t addrReg, uint8_t val){
-	return I2C_writeReg8(dev -> i2c, dev -> addrMag, addrReg, val);
+
+/*
+ * ==================================================================
+ * 					INTERNAL HELPERS OF MAGNOMETER
+ * ==================================================================
+ */
+static inline bool writeMag(const LSM303AGR_t* dev, uint8_t addrReg, uint8_t value){
+	return I2C_writeReg8(dev -> i2c, dev -> addrMag, addrReg, value);
 }
+
+
 
 static inline bool readMag(const LSM303AGR_t* dev, uint8_t addrReg, uint8_t* outResult){
 	return I2C_readReg8(dev -> i2c, dev -> addrMag, addrReg, outResult);
 }
+
 
 /*
  * ==========================================================
@@ -69,6 +78,8 @@ bool lsm303agr_isPresent(){
 	if(!lsm303agr_whoAmI(&lsm303agrConfig, &whoAcc, &whoMag)) return false;
 	return ((whoAcc == LSM303AGR_WHO_AM_I_ACC_VAL) && (whoMag == LSM303AGR_WHO_AM_I_MAG_VAL));
 }
+
+
 
 
 
