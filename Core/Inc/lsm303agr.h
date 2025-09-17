@@ -10,6 +10,7 @@
 
 #include "stdio.h"
 #include "stdint.h"
+#include "stdbool.h"
 
 #include "i2c.h"
 
@@ -101,9 +102,9 @@
 
 #define LSM303AGR_WHO_AM_I_MAG			0x4FU
 
-#define LSM303AGR_CFG_REG1_MAG			0x60U
-#define LSM303AGR_CFG_REG2_MAG			0x61U
-#define LSM303AGR_CFG_REG3_MAG			0x62U
+#define LSM303AGR_CFG_REG_A_MAG			0x60U
+#define LSM303AGR_CFG_REG_B_MAG			0x61U
+#define LSM303AGR_CFG_REG_C_MAG			0x62U
 
 #define LSM303AGR_INT_CTRL_REG_MAG		0x63U
 #define LSM303AGR_INT_SOURCE_REG_MAG	0x64U
@@ -122,11 +123,63 @@
 #define LSM303AGR_OUT_Z_H_MAG			0x6DU
 
 /*
+ * ==============================================================
+ * 					REGISTER BIT POSITION DEFINES
+ * ==============================================================
+ */
+/* TEMP_CFG_REG_ACC */
+#define TEMP_ACC_ENABLE_Pos		6
+
+/* CTRL_REG1_ACC */
+#define REG1_ACC_XEN_Pos		0
+#define REG1_ACC_YEN_Pos		1
+#define REG1_ACC_ZEN_Pos		2
+#define	REG1_ACC_LPEN_Pos		3
+#define REG1_ACC_ODR_Pos		4
+
+/* CTRL_REG4_ACC */
+#define REG4_ACC_SPI_EN_Pos		0
+#define REG4_ACC_ST_Pos			1
+#define REG4_ACC_HR_Pos			3
+#define REG4_ACC_FS_Pos			4
+#define REG4_ACC_BLE_Pos		6
+#define REG4_ACC_BDU_Pos		7
+
+/* CTRL_REG5_ACC */
+#define REG5_ACC_BOOT_Pos		7
+
+/* CFG_REG_A_MAG */
+#define REG_A_MD_Pos			0
+#define REG_A_ODR_Pos			2
+#define REG_A_LP_Pos			4
+#define REG_A_SOFT_RST_Pos		5
+#define REG_A_REBOOT_Pos		6
+#define REG_A_COMP_TEMP_EN_Pos	7
+
+/*
+ * ===============================================================
+ * 					CONFIGURATION TABLES
+ * ===============================================================
+ */
+typedef enum{
+	POWER_DOWN_MODE = 0b0000,
+	_1HZ = 0b0001,
+	_10Hz = 0b0010,
+	_25Hz = 0b0011,
+	_50Hz = 0b0100,
+	_100Hz = 0b0101,
+	_200Hz = 0b0110,
+	_400Hz = 0b0111,
+	_1K620Hz = 0b1000, //Low-power mode
+	_1K344Hz = 0b1001, //HR/Normal mode
+	_5K376Hz = 0b1001 //Low-power mode
+}ODR_Sel_t;
+
+/*
  * ==========================================================
  *					BUS & PIN SELECTION
  * ==========================================================
  */
-
 typedef struct {
 	I2C_GPIO_Config_t	i2c;	//Bus/pin selection
 	uint8_t 			addrAcc;	//Accelerometer 7-bit address (default: 0x19U)
@@ -138,19 +191,27 @@ typedef struct {
  * 					FUNCTION DECLARATIONS
  * ======================================================================
  */
-bool lsm303agr_whoAmI(const LSM303AGR_t* dev, uint8_t* whoAcc, uint8_t* whoMag);
-bool lsm303agr_isPresent();
+bool LSM303AGR_whoAmI(const LSM303AGR_t* lsm303agrStruct, uint8_t* whoAcc, uint8_t* whoMag);
+bool LSM303AGR_isPresent(const LSM303AGR_t* lsm303agrStruct);
 
-bool lsm303agr_writeAcc();
-bool lsm303agr_readAAcc();
+bool LSM303AGR_writeAcc(const LSM303AGR_t* dev, uint8_t regAddr, uint8_t value);
+bool LSM303AGR_readAcc(const LSM303AGR_t* dev, uint8_t regAddr, uint8_t* outResult);
+bool LSM303AGR_multiWriteAcc(const LSM303AGR_t* dev, uint8_t startRegAddr, uint8_t* dataBuf, uint16_t quantityOfReg);
+bool LSM303AGR_multiReadAcc(const LSM303AGR_t* dev, uint8_t startRegAddr, uint16_t quantityOfReg, uint8_t* outResultBuf);
 
-bool lsm303agr_writeMag();
-bool lsm303agr_readMag();
+bool LSM303AGR_writeMag(const LSM303AGR_t* dev, uint8_t regAddr, uint8_t value);
+bool LSM303AGR_readMag(const LSM303AGR_t* dev, uint8_t regAddr, uint8_t* outResult);
+bool LSM303AGR_multiWriteMag(const LSM303AGR_t* dev, uint8_t startRegAddr, uint8_t* dataBuf, uint16_t quantityOfReg);
+bool LSM303AGR_multiReadMag(const LSM303AGR_t* dev, uint8_t startRegAddr, uint16_t quantityOfReg, uint8_t* outResultBuf);
 
-bool lsm303agr_readAccRaw();
-bool lsm303agr_readMagRaw();
-bool lsm303agr_readTempRaw();
+bool LSM303AGR_rebootAcc(const LSM303AGR_t* lsm303agrStruct);
+bool LSM303AGR_softReset(const LSM303AGR_t* lsm303agrStruct);
 
+bool LSM303AGR_disableTemperature(const LSM303AGR_t* lsm303agrStruct);
+bool LSM303AGR_enableTemperature(const LSM303AGR_t* lsm303agrStruct);
+bool LSM303AGR_enableBDU(const LSM303AGR_t* lsm303agrStruct);
+bool LSM303AGR_setODR(const LSM303AGR_t* lsm303agrStruct, ODR_Sel_t odr);
+int8_t LSM303AGR_getTemperature(const LSM303AGR_t* lsm303agrStruct);
 #endif /* INC_LSM303AGR_H_ */
 
 

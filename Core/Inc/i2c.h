@@ -229,6 +229,7 @@ typedef struct{
  */
 bool writeI2C(I2C_Name_t i2cBus, I2C_Reg_t regName, uint8_t bitPosition, uint32_t value);
 
+
 /*
  * @brief Read a field (bit or multi-bit) from an I2C register.
  *
@@ -240,11 +241,13 @@ bool writeI2C(I2C_Name_t i2cBus, I2C_Reg_t regName, uint8_t bitPosition, uint32_
  */
 uint32_t readI2C(I2C_Name_t i2cBus, I2C_Reg_t regName, uint8_t bitPosition);
 
+
 /*
  * @brief Initialize SCL pin for a given bus (AF, OD, speed, pull).
  * @return true if the mapping is valid and configuration written; false otherwise.
  */
 bool I2C_sclPinInit(GPIO_Pin_t sclPin, GPIO_PortName_t sclPort, I2C_Name_t i2cBus);
+
 
 /*
  * @brief Initialize SDA pin for a given bus (AF, OD, speed, pull).
@@ -258,6 +261,7 @@ bool I2C_sdaPinInit(GPIO_Pin_t sdaPin, GPIO_PortName_t sdaPort, I2C_Name_t i2cBu
  */
 bool I2C_GPIO_init(I2C_GPIO_Config_t config);
 
+
 /*
  * @brief Configure CCR[11:0], DUTY, F/S, and TRISE for a desired SCL rate.
  *
@@ -270,6 +274,7 @@ bool I2C_GPIO_init(I2C_GPIO_Config_t config);
  */
 bool I2C_getCCR(I2C_CCR_Mode_t ccrMode, uint32_t sclFreq, uint32_t fclk1, I2C_GPIO_Config_t config);
 
+
 /*
  * @brief Write one byte to an 8-bit sub-register on a 7-bit I2C slave.
  *
@@ -281,6 +286,34 @@ bool I2C_getCCR(I2C_CCR_Mode_t ccrMode, uint32_t sclFreq, uint32_t fclk1, I2C_GP
  * @return true on success; false on NACK/timeout/parameter errors.
  */
 bool I2C_writeReg8(I2C_GPIO_Config_t config, uint8_t slaveAddr, uint8_t slaveRegAddr, uint8_t value);
+
+
+/*
+ * @brief	Write multiple bytes starting at a sub-register (burst write)
+ *
+ * Sequence (naster)
+ * 		Wait untul BUSY = 0
+ * 		START
+ * 		Send <SlaveAddr | W>, wait ADDR = 1 (Abort on AF/NACK)
+ * 		Clear ADDR by reading SR1 then SR2
+ * 		Send sub-register, typically with autoIncrement bit set, wait TXE/BTF (abort on AF/NACK)
+ * 		Send @p len data bytes back to back =, each waiting TXE/BTF
+ * 		STOP
+ *
+ * @param	config			I2C bus/pin selection
+ * @param	slaveAddr		7-bit UNSHIFTED slave address
+ * @param	startRegAddr	SUB-register address
+ * @param	autoIncreBitSet	Auto Increment bit/cmd of slave internal auto increment
+ * @param	dataBuf			Pointer to @p len bytes to transmit
+ * @param	len				Number of data bytes to write.
+ */
+bool I2C_writeBurst(I2C_GPIO_Config_t config,
+                    uint8_t           slaveAddr,
+                    uint8_t           startRegAddr,
+					uint8_t 		  autoIncreBitSet,
+                    uint8_t*          dataBuf,
+					uint16_t		  len);
+
 
 /*
  * @brief	Read one byte from an 8-bit sub-register on a 7-bit I2C slave
@@ -295,12 +328,30 @@ bool I2C_writeReg8(I2C_GPIO_Config_t config, uint8_t slaveAddr, uint8_t slaveReg
  */
 bool I2C_readReg8(I2C_GPIO_Config_t config, uint8_t slaveAddr, uint8_t slaveRegAddr, uint8_t* outResult);
 
+
+/*
+ * @brief	Read multiple byte from an 8-bit sub-register on a 7-bit I2C slave
+ *
+ * @param	config			I2C bus/pin selection
+ * @param	slaveAddr		7-bit UNSHIFTED slave address
+ * @param	startRegAddr	SUB-register address
+ * @param	autoIncreBitSet	Auto Increment bit/cmd of slave internal auto increment
+ * @param	dataBuf			Pointer to @p len bytes to transmit
+ * @param	len				Number of data bytes to write.
+ */
+bool I2C_readBurst(I2C_GPIO_Config_t config,
+				   uint8_t           slaveAddr,
+				   uint8_t           startRegAddr,
+				   uint8_t			 autoIncreBitSet,
+				   uint16_t			 len,
+				   uint8_t* 		 outResultBuf);
+
 /*
  * @brief Basic initialization: enable clock, configure GPIOs, program CR2/CCR/TRISE, enable PE.
  *
  * @param config     Bus + GPIO mapping.
  */
-void I2C_basicConfigInit(I2C_GPIO_Config_t config);
+void I2C_Init(I2C_GPIO_Config_t config);
 
 #endif /* INC_I2C_H_ */
 
