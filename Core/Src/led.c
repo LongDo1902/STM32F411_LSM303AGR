@@ -8,11 +8,14 @@
 
 void ledGreenInit(){
 	Enable_GPIO_Clock(my_GPIOD);
+	writePin(LED_GREEN, my_GPIOD, OSPEEDR, HIGH_SPEED);
 	writePin(LED_GREEN, my_GPIOD, MODER, OUTPUT_MODE);
+
 }
 
 void ledOrangeInit(){
 	Enable_GPIO_Clock(my_GPIOD);
+	writePin(LED_GREEN, my_GPIOD, OSPEEDR, HIGH_SPEED);
 	writePin(LED_ORANGE, my_GPIOD, MODER, OUTPUT_MODE);
 }
 

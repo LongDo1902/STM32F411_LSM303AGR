@@ -311,7 +311,7 @@ bool I2C_writeBurst(I2C_GPIO_Config_t config,
                     uint8_t           slaveAddr,
                     uint8_t           startRegAddr,
 					uint8_t 		  autoIncreBitSet,
-                    uint8_t*          dataBuf,
+                    const uint8_t*    dataBuf,
 					uint16_t		  len);
 
 

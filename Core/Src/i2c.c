@@ -579,7 +579,7 @@ bool I2C_writeBurst(I2C_GPIO_Config_t config,
                     uint8_t           slaveAddr,
                     uint8_t           startRegAddr,
 					uint8_t 		  autoIncreBitSet,
-                    uint8_t*          dataBuf,
+                    const uint8_t*    dataBuf,
 					uint16_t		  len) {
 
 	if((len == 0u) | (dataBuf == NULL)) return false;
@@ -810,7 +810,7 @@ bool I2C_readBurst(I2C_GPIO_Config_t config,
 /* Default timing parameters */
 I2C_Timing_t timingParam = {
     .ccrMode  = I2C_SM_MODE,        /* Standard mode                     */
-    .sclFreq  = 100000u,            /* 100 kHz                           */
+    .sclFreq  = 100000u,            /* 100kHz                           */
     .fclk1_Hz = SYSCLK_FREQ_16M     /* Default APB1/sys clock, from HAL  */
 };
 

@@ -4,7 +4,6 @@
  * Created on Aug 31, 2025
  * 		Author dobao
  */
-
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -14,7 +13,6 @@
 #include "i2c.h"
 #include "led.h"
 #include "lsm303agr.h"
-
 /*
  * =============================================================
  * 					PIN & PIN & I2C ADDR
@@ -42,9 +40,11 @@ static const LSM303AGR_t lsm303agrConfig = {
  * 					PARAMETERS DECLARATIONS
  * ===============================================================
  */
-uint8_t value1 = 0;
-uint8_t value2 = 0;
-int8_t lsm303agr_temperature = 0;
+uint8_t tempAddrVal = 0;
+uint8_t bduAddrVal = 0;
+float lsm303agr_temperature = 0.0;
+uint8_t ctrlReg2 = 0;
+uint8_t referenceDataCapture = 0;
 
 uint8_t dataOutBuf[6];
 
@@ -52,31 +52,50 @@ bool isRead1Ok = false;
 bool isRead2Ok = false;
 bool isMultiReadOk = false;
 
+
 int main(void){
 	HAL_Init();
 	ledsInit();
 
-	(void)I2C_GPIO_init(i2cConfig);
-	(void)I2C_Init(i2cConfig);
+	/* Initialize I2C pins and its configurations to communicate to LSM303AGR */
+	(void)I2C_GPIO_init(i2cConfig); //Init SCL and SDA pins
+	(void)I2C_Init(i2cConfig); //Init CCR mode and SCL frequency
+	HAL_Delay(5); //Small delay ensure everything boot up fine before configure others
 
-	LSM303AGR_rebootAcc(&lsm303agrConfig);
+	/* Reset the sensor registers to its default values */
 	LSM303AGR_softReset(&lsm303agrConfig);
+	HAL_Delay(5);
 
-	LSM303AGR_multiReadAcc(&lsm303agrConfig, LSM303AGR_CTRL_REG1_ACC, sizeof(dataOutBuf), dataOutBuf);
+	/* Set the Output Data Rate */
+	if(!LSM303AGR_setODR(&lsm303agrConfig, _400Hz)) return false;
+	HAL_Delay(5);
 
-	(void)LSM303AGR_readAcc(&lsm303agrConfig, LSM303AGR_TEMP_CFG_REG_ACC, &value2);
-	LSM303AGR_enableTemperature(&lsm303agrConfig);
-	(void)LSM303AGR_readAcc(&lsm303agrConfig, LSM303AGR_TEMP_CFG_REG_ACC, &value2);
+	/* Enable BDU and Temperature */
+	if(!LSM303AGR_enableTemperature(&lsm303agrConfig)) return false;
+	HAL_Delay(5);
+	if(!LSM303AGR_enableBDU(&lsm303agrConfig)) return false;
+	HAL_Delay(5);
 
 	while(1){
-		if(isRead1Ok){
-			ledControl(LED_GREEN, ON);
-		}
-		if(isRead2Ok){
-			ledControl(LED_ORANGE, ON);
-		}
-		if(isMultiReadOk){
-			ledControl(LED_RED, ON);
-		}
+		LSM303AGR_getTemperature(&lsm303agrConfig, &lsm303agr_temperature);
+		HAL_Delay(250);
 	}
 }
+
+
+///* Sensor reset test */
+//	LSM303AGR_readAcc(&lsm303agrConfig, LSM303AGR_CTRL_REG2_ACC, &ctrlReg2);
+//	LSM303AGR_writeAcc(&lsm303agrConfig, LSM303AGR_CTRL_REG2_ACC, 0b11);
+//	LSM303AGR_readAcc(&lsm303agrConfig, LSM303AGR_CTRL_REG2_ACC, &ctrlReg2);
+//
+//	LSM303AGR_softReset(&lsm303agrConfig);
+//	LSM303AGR_readAcc(&lsm303agrConfig, LSM303AGR_CTRL_REG2_ACC, &ctrlReg2);
+//
+//
+//
+//	LSM303AGR_readAcc(&lsm303agrConfig, LSM303AGR_REFERENCE_ACC, &referenceDataCapture);
+//	LSM303AGR_writeAcc(&lsm303agrConfig, LSM303AGR_REFERENCE_ACC, 0b111);
+//	LSM303AGR_readAcc(&lsm303agrConfig, LSM303AGR_REFERENCE_ACC, &referenceDataCapture);
+//
+//	LSM303AGR_softReset(&lsm303agrConfig);
+//	LSM303AGR_readAcc(&lsm303agrConfig, LSM303AGR_REFERENCE_ACC, &referenceDataCapture);

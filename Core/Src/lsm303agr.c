@@ -5,6 +5,59 @@
  *      Author: dobao
  */
 #include "lsm303agr.h"
+/*
+ * ==================================================================
+ * 					CONSTANTS/PARAMETERS DECLARATION
+ * ==================================================================
+ */
+static const uint8_t LSM303AGR_accDefault[] = {
+		TEMP_CFG_REG_A_DF,
+
+		CTRL_REG1_A_DF,
+		CTRL_REG2_A_DF,
+		CTRL_REG3_A_DF,
+		CTRL_REG4_A_DF,
+		CTRL_REG5_A_DF,
+		CTRL_REG6_A_DF,
+
+		REFERENCE_A_DF,
+		FIFO_CTRL_REG_A_DF,
+
+		INT1_CFG_A_DF,
+		INT1_THS_A_DF,
+		INT1_DURATION_A_DF,
+
+		INT2_CFG_A_DF,
+		INT2_THS_A_DF,
+		INT2_DURATION_A_DF,
+
+		CLICK_CFG_A_DF,
+		CLICK_THS_A_DF,
+
+		TIME_LIMIT_A_DF,
+		TIME_LATENCY_A_DF,
+		TIME_WINDOW_A_DF,
+
+		ACT_THS_A_DF,
+		ACT_DUR_A_DF
+};
+
+static const uint8_t LSM303AGR_magDefault[] = {
+		OFFSET_X_REG_L_M_DF,
+		OFFSET_X_REG_H_M_DF,
+		OFFSET_Y_REG_L_M_DF,
+		OFFSET_Y_REG_H_M_DF,
+		OFFSET_Z_REG_L_M_DF,
+		OFFSET_Z_REG_H_M_DF,
+
+		CFG_REG_A_M_DF,
+		CFG_REG_B_M_DF,
+		CFG_REG_C_M_DF,
+		INT_CTRL_REG_M_DF,
+		INT_THS_L_REG_M_DF,
+		INT_THS_H_REG_M_DF
+};
+
 
 /*
  * ==================================================================
@@ -19,7 +72,7 @@ static inline bool readAcc(const LSM303AGR_t* dev, uint8_t regAddr, uint8_t* out
 	return I2C_readReg8(dev -> i2c, dev -> addrAcc, regAddr, outResult);
 }
 
-static inline bool multiWriteAcc(const LSM303AGR_t* dev, uint8_t startRegAddr, uint8_t* dataBuf, uint16_t quantityOfReg){
+static inline bool multiWriteAcc(const LSM303AGR_t* dev, uint8_t startRegAddr, const uint8_t* dataBuf, uint16_t quantityOfReg){
 	return I2C_writeBurst(dev -> i2c, dev -> addrAcc, startRegAddr, LSM303AGR_ADDR_AUTO_INC, dataBuf, quantityOfReg);
 }
 
@@ -40,7 +93,7 @@ static inline bool readMag(const LSM303AGR_t* dev, uint8_t regAddr, uint8_t* out
 	return I2C_readReg8(dev -> i2c, dev -> addrMag, regAddr, outResult);
 }
 
-static inline bool multiWriteMag(const LSM303AGR_t* dev, uint8_t startRegAddr, uint8_t* dataBuf, uint16_t quantityOfReg){
+static inline bool multiWriteMag(const LSM303AGR_t* dev, uint8_t startRegAddr, const uint8_t* dataBuf, uint16_t quantityOfReg){
 	return I2C_writeBurst(dev -> i2c, dev -> addrMag, startRegAddr, LSM303AGR_ADDR_AUTO_INC, dataBuf, quantityOfReg);
 }
 
@@ -61,7 +114,7 @@ bool LSM303AGR_readAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t regAddr, uint
 	return readAcc(lsm303agrStruct, regAddr, outResult);
 }
 
-bool LSM303AGR_multiWriteAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t startRegAddr, uint8_t* dataBuf, uint16_t quantityOfReg){
+bool LSM303AGR_multiWriteAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t startRegAddr, const uint8_t* dataBuf, uint16_t quantityOfReg){
 	return multiWriteAcc(lsm303agrStruct, startRegAddr, dataBuf, quantityOfReg);
 }
 
@@ -82,7 +135,7 @@ bool LSM303AGR_readMag(const LSM303AGR_t* lsm303agrStruct, uint8_t regAddr, uint
 	return readMag(lsm303agrStruct, regAddr, outResult);
 }
 
-bool LSM303AGR_multiWriteMag(const LSM303AGR_t* lsm303agrStruct, uint8_t startRegAddr, uint8_t* dataBuf, uint16_t quantityOfReg){
+bool LSM303AGR_multiWriteMag(const LSM303AGR_t* lsm303agrStruct, uint8_t startRegAddr, const uint8_t* dataBuf, uint16_t quantityOfReg){
 	return multiWriteMag(lsm303agrStruct, startRegAddr, dataBuf, quantityOfReg);
 }
 
@@ -92,7 +145,7 @@ bool LSM303AGR_multiReadMag(const LSM303AGR_t* lsm303agrStruct, uint8_t startReg
 
 /*
  * ==========================================================
- * 					PUBLIC HELPERS
+ * 					ID VERIFICATION
  * ==========================================================
  */
 /* @brief	Returns the WHO_AM_I values of both sub-devices */
@@ -118,6 +171,12 @@ bool LSM303AGR_isPresent(const LSM303AGR_t* lsm303agrStruct){
 			(whoMag == LSM303AGR_WHO_AM_I_MAG_VAL));
 }
 
+
+/*
+ * ==========================================================
+ * 					REBOOT AND RESET
+ * ==========================================================
+ */
 /*
  * @brief	Reboot accelerometer memory content
  */
@@ -127,25 +186,45 @@ bool LSM303AGR_rebootAcc(const LSM303AGR_t* lsm303agrStruct){
 
 	/* Start to assign and write regVal to CTRL_REG5_ACC to start the reboot process */
 	regVal |= (SET << REG5_ACC_BOOT_Pos);
-	if(!writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG5_ACC, regVal)) return false; // Pass boot command
-	HAL_Delay(50);
+	if(!writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG5_ACC, regVal)) return false; // Pass reboot command
+	HAL_Delay(30);
 	return true;
 }
 
 /*
- * @brief	Reset all configuration registers and user registers
+ * @brief	Reboot magnetometer memory content
  */
-bool LSM303AGR_softReset(const LSM303AGR_t* lsm303agrStruct){
+bool LSM303AGR_rebootMag(const LSM303AGR_t* lsm303agrStruct){
+	uint8_t regVal = 0;
+	if(!readMag(lsm303agrStruct, LSM303AGR_CFG_REG_A_MAG, &regVal)) return false; //Extract the current status bit-field and assign it to regVal
+
+	/* Start assigning and writting regVal to CTRL_REG5_ACC to start the reboot process */
+	regVal |= (SET << REG_A_REBOOT_Pos);
+	if(!writeMag(lsm303agrStruct, LSM303AGR_CFG_REG_A_MAG, regVal)) return false; //Pass reboot command
+	HAL_Delay(30);
+	return true;
+}
+
+/*
+ * @brief	SET reset bit
+ */
+static bool getSoftReset(const LSM303AGR_t* lsm303agrStruct){
 	uint8_t regVal = 0;
 	if(!readMag(lsm303agrStruct, LSM303AGR_CFG_REG_A_MAG, &regVal)) return false; //Extract the current status bit-field and assign it to regVal
 
 	/* Start to assign and write regVal to CFG_REG_A to start FULL CHIP RESET */
 	regVal |= (SET << REG_A_SOFT_RST_Pos);
 	if(!writeMag(lsm303agrStruct, LSM303AGR_CFG_REG_A_MAG, regVal)) return false;
-	HAL_Delay(50);
+	HAL_Delay(30);
 	return true;
 }
 
+
+/*
+ * ==========================================================
+ * 			   DISABLE AND ENABLE TEMPERATURE
+ * ==========================================================
+ */
 /*
  * @brief	Disable internal temperature sensor
  */
@@ -168,11 +247,70 @@ bool LSM303AGR_enableTemperature(const LSM303AGR_t* lsm303agrStruct){
 bool LSM303AGR_setODR(const LSM303AGR_t* lsm303agrStruct, ODR_Sel_t odr){
 	uint8_t regVal = 0;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, &regVal)) return false;
-
-	regVal |= (odr << REG1_ACC_ODR_Pos);
+	regVal &= ~(0b1111 << REG1_ACC_LPEN_Pos); //Clear the existing bits in the register value
+	regVal |= (odr << REG1_ACC_ODR_Pos); //Set the new value
 	return writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, regVal);
 }
 
+/*
+ * @brief	Set Power Mode
+ */
+bool LSM303AGR_setLowPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t powerMode){
+	/* Extract the existing bit values from the register CTRL_REG1 */
+	uint8_t ctrlReg1Val = 0;
+	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, &ctrlReg1Val)) return false;
+
+	/* Extract the existing but values from the register CTRL_REG4 */
+	uint8_t ctrlReg4Val = 0;
+	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, &ctrlReg4Val)) return false;
+
+	switch(powerMode){
+		case LOW_POWER_MODE:
+			//To enter Low-Power mode, we only need to SET the LPen bit.
+			ctrlReg1Val |= (0b1 << REG1_ACC_LPEN_Pos);
+			break;
+
+		case NORMAL_POWER_MODE:
+			//To enter Normal mode, we must CLEAR LPen and CLEAR HR bit.
+			ctrlReg1Val &= ~(0b1 << REG1_ACC_LPEN_Pos);
+			ctrlReg4Val &= ~(0b1 << REG4_ACC_HR_Pos);
+			break;
+
+		case HIGH_RES_POWER_MODE:
+			//To enter High-Res mode, we must CLEAR LPen, and set HR.
+			ctrlReg1Val &= (~0b1 << REG1_ACC_LPEN_Pos);
+			ctrlReg4Val |= (0b1 << REG4_ACC_HR_Pos);
+			break;
+
+		default: return false;
+	}
+	if(!writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, ctrlReg1Val)) return false;
+	if(!writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, ctrlReg4Val)) return false;
+	return true;
+}
+
+/* @brief	Get power mode profile */
+bool LSM303AGR_getPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t* outMode){
+	//Check for NULL pointers
+	if(lsm303agrStruct == NULL || outMode == NULL){
+		return false;
+	}
+
+	//Read the required control registers
+	uint8_t valReg1 = 0;
+	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, &valReg1)) return false;
+
+	uint8_t valReg4 = 0;
+	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, &valReg4)) return false;
+
+	/* Check LPen bit. It has the highest priority. */
+	if(valReg1 & (0b1 << REG1_ACC_LPEN_Pos)) *outMode = LOW_POWER_MODE;
+	else {
+		if(valReg4 & (0b1 << REG4_ACC_HR_Pos)) *outMode = HIGH_RES_POWER_MODE;
+		else *outMode = NORMAL_POWER_MODE;
+	}
+	return true; //Success
+}
 
 /*
  * @brief	Enable Block Data Update for coherent 16-bit reads
@@ -189,20 +327,43 @@ bool LSM303AGR_enableBDU(const LSM303AGR_t* lsm303agrStruct){
 /*
  * @brief	Read Temperature value
  */
-int8_t LSM303AGR_getTemperature(const LSM303AGR_t* lsm303agrStruct){
-	if(!LSM303AGR_enableTemperature(lsm303agrStruct)) return false;
-	if(!LSM303AGR_enableBDU(lsm303agrStruct)) return false;
+bool LSM303AGR_getTemperature(const LSM303AGR_t* lsm303agrStruct, float* outTempC){
+	/* Check for NULL pointer */
+	if((lsm303agrStruct == NULL) || (outTempC == NULL)) return false;
+	/* Get the current power mode */
+	PowerMode_t currentMode;
+	if(!LSM303AGR_getPowerMode(lsm303agrStruct, &currentMode)) return false;
 
-	uint8_t tempBuf[2]; //tempBuf[0] = LSM303AGR_OUT_TEMP_L_ACC, tempBuf[1] = LSM303AGR_OUT_TEMP_H_ACC
-	if(!multiReadAcc(lsm303agrStruct, LSM303AGR_OUT_TEMP_L_ACC, sizeof(tempBuf), tempBuf)) return false;
+	/* Read the raw temperature data */
+	uint8_t temperatureBuf[2];
+	if(!multiReadAcc(lsm303agrStruct, LSM303AGR_OUT_TEMP_L_ACC, sizeof(temperatureBuf), temperatureBuf)) return false;
 
-	int8_t rawTemp = (int8_t) tempBuf[1]; //LSM303AGR_OUT_TEMP_H_ACC is a signed 8-bit
+	int16_t raw_16_val = 0;
+	/* Process temperature value base on the power mode */
+	switch(currentMode){
+		case LOW_POWER_MODE:
+			//Use the 8-bit formula for Low-Power mode
+			int8_t raw_8_val = (int8_t)temperatureBuf[1];
+			*outTempC = (float)raw_8_val + 25.0f;
+			break;
 
-	return rawTemp;
+		case NORMAL_POWER_MODE:
+			//Use 10-bit formula for Normal Mode
+			raw_16_val = (int16_t)((temperatureBuf[1] << 8) | temperatureBuf[0]);
+			int16_t raw_10_val = raw_16_val >> 6; //Right-shift by 6 to extract 10-bit signed value
+			*outTempC = ((float) raw_10_val / 4.0f) + 25.0f;
+			break;
+
+		case HIGH_RES_POWER_MODE:
+			raw_16_val = (int16_t)((temperatureBuf[1] << 8) | temperatureBuf[0]);
+			int16_t raw_12_val = raw_16_val >> 4; //Right-shift by 4 to extract 12-bit signed value
+			*outTempC = ((float) raw_12_val / 16.0f) + 25.0f;
+			break;
+
+		default: return false;
+	}
+	return true; //Success!
 }
-
-
-
 
 
 

@@ -176,6 +176,70 @@ typedef enum{
 }ODR_Sel_t;
 
 /*
+ * ===============================================================
+ * 				DEFAULT VALUES FOR MANUAL RESET
+ * ===============================================================
+ */
+typedef enum{
+	TEMP_CFG_REG_A_DF = 0x0,
+
+	CTRL_REG1_A_DF = 0x7,
+	CTRL_REG2_A_DF = 0x0,
+	CTRL_REG3_A_DF = 0x0,
+	CTRL_REG4_A_DF = 0x0,
+	CTRL_REG5_A_DF = 0x0,
+	CTRL_REG6_A_DF = 0x0,
+
+	REFERENCE_A_DF = 0x0,
+	FIFO_CTRL_REG_A_DF = 0x0,
+
+	INT1_CFG_A_DF = 0x0,
+	INT1_THS_A_DF = 0X0,
+	INT1_DURATION_A_DF = 0x0,
+
+	INT2_CFG_A_DF = 0x0,
+	INT2_THS_A_DF = 0x0,
+	INT2_DURATION_A_DF = 0x0,
+
+	CLICK_CFG_A_DF = 0x0,
+	CLICK_THS_A_DF = 0x0,
+
+	TIME_LIMIT_A_DF = 0x0,
+	TIME_LATENCY_A_DF = 0x0,
+	TIME_WINDOW_A_DF = 0x0,
+
+	ACT_THS_A_DF = 0x0,
+	ACT_DUR_A_DF = 0x0,
+
+	//----------------------------
+	OFFSET_X_REG_L_M_DF = 0x0,
+	OFFSET_X_REG_H_M_DF = 0x0,
+	OFFSET_Y_REG_L_M_DF = 0x0,
+	OFFSET_Y_REG_H_M_DF = 0x0,
+	OFFSET_Z_REG_L_M_DF = 0x0,
+	OFFSET_Z_REG_H_M_DF = 0x0,
+
+	CFG_REG_A_M_DF = 0x3,
+	CFG_REG_B_M_DF = 0x0,
+	CFG_REG_C_M_DF = 0x0,
+	INT_CTRL_REG_M_DF = 0xE,
+	INT_THS_L_REG_M_DF = 0x0,
+	INT_THS_H_REG_M_DF = 0x0
+}DefaultValue_t;
+
+/*
+ * ===============================================================
+ * 					POWER MODE SELECTIONS
+ * ===============================================================
+ */
+typedef enum{
+	//Note: These are not the bit values, it just a random number from 0 to 2
+	LOW_POWER_MODE = 0,
+	NORMAL_POWER_MODE = 1,
+	HIGH_RES_POWER_MODE = 2
+}PowerMode_t;
+
+/*
  * ==========================================================
  *					BUS & PIN SELECTION
  * ==========================================================
@@ -196,22 +260,27 @@ bool LSM303AGR_isPresent(const LSM303AGR_t* lsm303agrStruct);
 
 bool LSM303AGR_writeAcc(const LSM303AGR_t* dev, uint8_t regAddr, uint8_t value);
 bool LSM303AGR_readAcc(const LSM303AGR_t* dev, uint8_t regAddr, uint8_t* outResult);
-bool LSM303AGR_multiWriteAcc(const LSM303AGR_t* dev, uint8_t startRegAddr, uint8_t* dataBuf, uint16_t quantityOfReg);
+bool LSM303AGR_multiWriteAcc(const LSM303AGR_t* dev, uint8_t startRegAddr, const uint8_t* dataBuf, uint16_t quantityOfReg);
 bool LSM303AGR_multiReadAcc(const LSM303AGR_t* dev, uint8_t startRegAddr, uint16_t quantityOfReg, uint8_t* outResultBuf);
 
 bool LSM303AGR_writeMag(const LSM303AGR_t* dev, uint8_t regAddr, uint8_t value);
 bool LSM303AGR_readMag(const LSM303AGR_t* dev, uint8_t regAddr, uint8_t* outResult);
-bool LSM303AGR_multiWriteMag(const LSM303AGR_t* dev, uint8_t startRegAddr, uint8_t* dataBuf, uint16_t quantityOfReg);
+bool LSM303AGR_multiWriteMag(const LSM303AGR_t* dev, uint8_t startRegAddr, const uint8_t* dataBuf, uint16_t quantityOfReg);
 bool LSM303AGR_multiReadMag(const LSM303AGR_t* dev, uint8_t startRegAddr, uint16_t quantityOfReg, uint8_t* outResultBuf);
 
 bool LSM303AGR_rebootAcc(const LSM303AGR_t* lsm303agrStruct);
 bool LSM303AGR_softReset(const LSM303AGR_t* lsm303agrStruct);
 
+
 bool LSM303AGR_disableTemperature(const LSM303AGR_t* lsm303agrStruct);
 bool LSM303AGR_enableTemperature(const LSM303AGR_t* lsm303agrStruct);
 bool LSM303AGR_enableBDU(const LSM303AGR_t* lsm303agrStruct);
+
 bool LSM303AGR_setODR(const LSM303AGR_t* lsm303agrStruct, ODR_Sel_t odr);
-int8_t LSM303AGR_getTemperature(const LSM303AGR_t* lsm303agrStruct);
+bool LSM303AGR_setLowPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t powerMode);
+bool LSM303AGR_getPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t* outMode);
+
+bool LSM303AGR_getTemperature(const LSM303AGR_t* lsm303agrStruct, float* outTempC);
 #endif /* INC_LSM303AGR_H_ */
 
 
