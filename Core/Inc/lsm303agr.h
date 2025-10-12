@@ -8,9 +8,10 @@
 #ifndef INC_LSM303AGR_H_
 #define INC_LSM303AGR_H_
 
-#include "stdio.h"
-#include "stdint.h"
-#include "stdbool.h"
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
 
 #include "i2c.h"
 
@@ -227,6 +228,13 @@ typedef enum{
 	INT_THS_H_REG_M_DF = 0x0
 }DefaultValue_t;
 
+typedef struct{
+	uint8_t startReg;
+	uint8_t len;
+} RegSpan_t;
+
+#define ARRLEN(x) (sizeof(x)/sizeof((x)[0]))
+
 /*
  * ===============================================================
  * 					POWER MODE SELECTIONS
@@ -258,29 +266,29 @@ typedef struct {
 bool LSM303AGR_whoAmI(const LSM303AGR_t* lsm303agrStruct, uint8_t* whoAcc, uint8_t* whoMag);
 bool LSM303AGR_isPresent(const LSM303AGR_t* lsm303agrStruct);
 
-bool LSM303AGR_writeAcc(const LSM303AGR_t* dev, uint8_t regAddr, uint8_t value);
-bool LSM303AGR_readAcc(const LSM303AGR_t* dev, uint8_t regAddr, uint8_t* outResult);
-bool LSM303AGR_multiWriteAcc(const LSM303AGR_t* dev, uint8_t startRegAddr, const uint8_t* dataBuf, uint16_t quantityOfReg);
-bool LSM303AGR_multiReadAcc(const LSM303AGR_t* dev, uint8_t startRegAddr, uint16_t quantityOfReg, uint8_t* outResultBuf);
+bool LSM303AGR_writeAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t regAddr, uint8_t value);
+bool LSM303AGR_readAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t regAddr, uint8_t* outResult);
+bool LSM303AGR_multiWriteAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t startRegAddr, const uint8_t* dataBuf, uint16_t quantityOfReg);
+bool LSM303AGR_multiReadAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t startRegAddr, uint16_t quantityOfReg, uint8_t* outResultBuf);
 
-bool LSM303AGR_writeMag(const LSM303AGR_t* dev, uint8_t regAddr, uint8_t value);
-bool LSM303AGR_readMag(const LSM303AGR_t* dev, uint8_t regAddr, uint8_t* outResult);
-bool LSM303AGR_multiWriteMag(const LSM303AGR_t* dev, uint8_t startRegAddr, const uint8_t* dataBuf, uint16_t quantityOfReg);
-bool LSM303AGR_multiReadMag(const LSM303AGR_t* dev, uint8_t startRegAddr, uint16_t quantityOfReg, uint8_t* outResultBuf);
+bool LSM303AGR_writeMag(const LSM303AGR_t* lsm303agrStruct, uint8_t regAddr, uint8_t value);
+bool LSM303AGR_readMag(const LSM303AGR_t* lsm303agrStruct, uint8_t regAddr, uint8_t* outResult);
+bool LSM303AGR_multiWriteMag(const LSM303AGR_t* lsm303agrStruct, uint8_t startRegAddr, const uint8_t* dataBuf, uint16_t quantityOfReg);
+bool LSM303AGR_multiReadMag(const LSM303AGR_t* lsm303agrStruct, uint8_t startRegAddr, uint16_t quantityOfReg, uint8_t* outResultBuf);
 
-bool LSM303AGR_rebootAcc(const LSM303AGR_t* lsm303agrStruct);
 bool LSM303AGR_softReset(const LSM303AGR_t* lsm303agrStruct);
-
 
 bool LSM303AGR_disableTemperature(const LSM303AGR_t* lsm303agrStruct);
 bool LSM303AGR_enableTemperature(const LSM303AGR_t* lsm303agrStruct);
-bool LSM303AGR_enableBDU(const LSM303AGR_t* lsm303agrStruct);
+bool LSM303AGR_enableBDU_acc(const LSM303AGR_t* lsm303agrStruct);
 
-bool LSM303AGR_setODR(const LSM303AGR_t* lsm303agrStruct, ODR_Sel_t odr);
-bool LSM303AGR_setLowPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t powerMode);
+bool LSM303AGR_setODR_acc(const LSM303AGR_t* lsm303agrStruct, ODR_Sel_t odr);
+bool LSM303AGR_setPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t powerMode);
 bool LSM303AGR_getPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t* outMode);
 
 bool LSM303AGR_getTemperature(const LSM303AGR_t* lsm303agrStruct, float* outTempC);
+
+
 #endif /* INC_LSM303AGR_H_ */
 
 

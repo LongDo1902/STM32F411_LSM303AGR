@@ -67,13 +67,13 @@ int main(void){
 	HAL_Delay(5);
 
 	/* Set the Output Data Rate */
-	if(!LSM303AGR_setODR(&lsm303agrConfig, _400Hz)) return false;
+	if(!LSM303AGR_setODR_acc(&lsm303agrConfig, _400Hz)) return false;
 	HAL_Delay(5);
 
 	/* Enable BDU and Temperature */
 	if(!LSM303AGR_enableTemperature(&lsm303agrConfig)) return false;
 	HAL_Delay(5);
-	if(!LSM303AGR_enableBDU(&lsm303agrConfig)) return false;
+	if(!LSM303AGR_enableBDU_acc(&lsm303agrConfig)) return false;
 	HAL_Delay(5);
 
 	while(1){
@@ -81,21 +81,3 @@ int main(void){
 		HAL_Delay(250);
 	}
 }
-
-
-///* Sensor reset test */
-//	LSM303AGR_readAcc(&lsm303agrConfig, LSM303AGR_CTRL_REG2_ACC, &ctrlReg2);
-//	LSM303AGR_writeAcc(&lsm303agrConfig, LSM303AGR_CTRL_REG2_ACC, 0b11);
-//	LSM303AGR_readAcc(&lsm303agrConfig, LSM303AGR_CTRL_REG2_ACC, &ctrlReg2);
-//
-//	LSM303AGR_softReset(&lsm303agrConfig);
-//	LSM303AGR_readAcc(&lsm303agrConfig, LSM303AGR_CTRL_REG2_ACC, &ctrlReg2);
-//
-//
-//
-//	LSM303AGR_readAcc(&lsm303agrConfig, LSM303AGR_REFERENCE_ACC, &referenceDataCapture);
-//	LSM303AGR_writeAcc(&lsm303agrConfig, LSM303AGR_REFERENCE_ACC, 0b111);
-//	LSM303AGR_readAcc(&lsm303agrConfig, LSM303AGR_REFERENCE_ACC, &referenceDataCapture);
-//
-//	LSM303AGR_softReset(&lsm303agrConfig);
-//	LSM303AGR_readAcc(&lsm303agrConfig, LSM303AGR_REFERENCE_ACC, &referenceDataCapture);
