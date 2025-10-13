@@ -89,7 +89,7 @@
 
 /*
  * =======================================================================
- * 						MAGNOMETOR REGISTER ADDRESS
+ * 						MAGNETOMETOR REGISTER ADDRESS
  * =======================================================================
  */
 #define LSM303AGR_OFFSET_X_REG_L_MAG	0x45U
@@ -163,17 +163,16 @@
  * ===============================================================
  */
 typedef enum{
-	POWER_DOWN_MODE = 0b0000,
-	_1HZ = 0b0001,
-	_10Hz = 0b0010,
-	_25Hz = 0b0011,
-	_50Hz = 0b0100,
-	_100Hz = 0b0101,
-	_200Hz = 0b0110,
-	_400Hz = 0b0111,
-	_1K620Hz = 0b1000, //Low-power mode
-	_1K344Hz = 0b1001, //HR/Normal mode
-	_5K376Hz = 0b1001 //Low-power mode
+	POWER_DOWN_MODE = 0x0,
+	_1HZ = 0x1,
+	_10Hz = 0x2,
+	_25Hz = 0x3,
+	_50Hz = 0x4,
+	_100Hz = 0x5,
+	_200Hz = 0x6,
+	_400Hz = 0x7,
+	_1K620Hz = 0x8, //Low-power mode
+	_1344HR_5376LP = 0x9 //HR/Normal mode or Low power mode
 }ODR_Sel_t;
 
 /*

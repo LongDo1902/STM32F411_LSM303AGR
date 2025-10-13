@@ -95,11 +95,13 @@ static inline bool readAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t regAddr, 
 }
 
 static inline bool multiWriteAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t startRegAddr, const uint8_t* dataBuf, uint16_t quantityOfReg){
-	return I2C_writeBurst(lsm303agrStruct -> i2c, lsm303agrStruct -> addrAcc, startRegAddr, LSM303AGR_ADDR_AUTO_INC, dataBuf, quantityOfReg);
+	uint8_t isIncrement = (quantityOfReg > 1) ? LSM303AGR_ADDR_AUTO_INC : 0u;
+	return I2C_writeBurst(lsm303agrStruct -> i2c, lsm303agrStruct -> addrAcc, startRegAddr, isIncrement, dataBuf, quantityOfReg);
 }
 
 static inline bool multiReadAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t startRegAddr, uint16_t quantityOfReg, uint8_t* outResultBuf){
-	return I2C_readBurst(lsm303agrStruct -> i2c, lsm303agrStruct -> addrAcc, startRegAddr, LSM303AGR_ADDR_AUTO_INC, quantityOfReg, outResultBuf);
+	uint8_t isIncrement = (quantityOfReg > 1) ? LSM303AGR_ADDR_AUTO_INC : 0u;
+	return I2C_readBurst(lsm303agrStruct -> i2c, lsm303agrStruct -> addrAcc, startRegAddr, isIncrement, quantityOfReg, outResultBuf);
 }
 
 /*
@@ -116,11 +118,13 @@ static inline bool readMag(const LSM303AGR_t* lsm303agrStruct, uint8_t regAddr, 
 }
 
 static inline bool multiWriteMag(const LSM303AGR_t* lsm303agrStruct, uint8_t startRegAddr, const uint8_t* dataBuf, uint16_t quantityOfReg){
-	return I2C_writeBurst(lsm303agrStruct -> i2c, lsm303agrStruct -> addrMag, startRegAddr, LSM303AGR_ADDR_AUTO_INC, dataBuf, quantityOfReg);
+	uint8_t isIncrement = (quantityOfReg > 1) ? LSM303AGR_ADDR_AUTO_INC : 0u;
+	return I2C_writeBurst(lsm303agrStruct -> i2c, lsm303agrStruct -> addrMag, startRegAddr, isIncrement, dataBuf, quantityOfReg);
 }
 
 static inline bool multiReadMag(const LSM303AGR_t* lsm303agrStruct, uint8_t startRegAddr, uint16_t quantityOfReg, uint8_t* outResultBuf){
-	return I2C_readBurst(lsm303agrStruct -> i2c, lsm303agrStruct -> addrMag, startRegAddr, LSM303AGR_ADDR_AUTO_INC, quantityOfReg, outResultBuf);
+	uint8_t isIncrement = (quantityOfReg > 1) ? LSM303AGR_ADDR_AUTO_INC : 0u;
+	return I2C_readBurst(lsm303agrStruct -> i2c, lsm303agrStruct -> addrMag, startRegAddr, isIncrement, quantityOfReg, outResultBuf);
 }
 
 /*
@@ -172,7 +176,7 @@ bool LSM303AGR_multiReadMag(const LSM303AGR_t* lsm303agrStruct, uint8_t startReg
  */
 /* @brief	Returns the WHO_AM_I values of both sub-devices */
 bool LSM303AGR_whoAmI(const LSM303AGR_t* lsm303agrStruct, uint8_t* whoAcc, uint8_t* whoMag){
-	if((lsm303agrStruct == NULL) | (whoAcc == NULL) | (whoMag == NULL)) return false;
+	if((lsm303agrStruct == NULL) || (whoAcc == NULL) || (whoMag == NULL)) return false;
 
 	/* Accelerometer WHO_AM_I_ACC @ 0x0F should be 0x33 */
 	if(!readAcc(lsm303agrStruct, LSM303AGR_WHO_AM_I_ACC, whoAcc)) return false;
@@ -293,7 +297,6 @@ bool LSM303AGR_softReset(const LSM303AGR_t* lsm303agrStruct){
 	return true;
 }
 
-
 /*
  * ==========================================================
  * 			   DISABLE AND ENABLE TEMPERATURE
@@ -313,89 +316,6 @@ bool LSM303AGR_disableTemperature(const LSM303AGR_t* lsm303agrStruct){
 bool LSM303AGR_enableTemperature(const LSM303AGR_t* lsm303agrStruct){
 	uint8_t enableTemp = (0b11 << TEMP_ACC_ENABLE_Pos);
 	return writeAcc(lsm303agrStruct, LSM303AGR_TEMP_CFG_REG_ACC, enableTemp);
-}
-
-/*
- * @brief	Set ODR
- */
-bool LSM303AGR_setODR_acc(const LSM303AGR_t* lsm303agrStruct, ODR_Sel_t odr){
-	uint8_t regVal = 0;
-	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, &regVal)) return false;
-	regVal &= ~(0b1111 << REG1_ACC_LPEN_Pos); //Clear the existing bits in the register value
-	regVal |= (odr << REG1_ACC_ODR_Pos); //Set the new value
-	return writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, regVal);
-}
-
-/*
- * @brief	Set Power Mode
- */
-bool LSM303AGR_setPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t powerMode){
-	/* Extract the existing bit values from the register CTRL_REG1 */
-	uint8_t ctrlReg1Val = 0;
-	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, &ctrlReg1Val)) return false;
-
-	/* Extract the existing but values from the register CTRL_REG4 */
-	uint8_t ctrlReg4Val = 0;
-	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, &ctrlReg4Val)) return false;
-
-	switch(powerMode){
-		case LOW_POWER_MODE:
-			//To enter Low-Power mode, we only need to SET the LPen bit.
-			ctrlReg1Val |= (0b1 << REG1_ACC_LPEN_Pos);
-			break;
-
-		case NORMAL_POWER_MODE:
-			//To enter Normal mode, we must CLEAR LPen and CLEAR HR bit.
-			ctrlReg1Val &= ~(0b1 << REG1_ACC_LPEN_Pos);
-			ctrlReg4Val &= ~(0b1 << REG4_ACC_HR_Pos);
-			break;
-
-		case HIGH_RES_POWER_MODE:
-			//To enter High-Res mode, we must CLEAR LPen, and set HR.
-			ctrlReg1Val &= (~0b1 << REG1_ACC_LPEN_Pos);
-			ctrlReg4Val |= (0b1 << REG4_ACC_HR_Pos);
-			break;
-
-		default: return false;
-	}
-	if(!writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, ctrlReg1Val)) return false;
-	if(!writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, ctrlReg4Val)) return false;
-	return true;
-}
-
-/* @brief	Get power mode profile */
-bool LSM303AGR_getPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t* outMode){
-	//Check for NULL pointers
-	if(lsm303agrStruct == NULL || outMode == NULL){
-		return false;
-	}
-
-	//Read the required control registers
-	uint8_t valReg1 = 0;
-	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, &valReg1)) return false;
-
-	uint8_t valReg4 = 0;
-	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, &valReg4)) return false;
-
-	/* Check LPen bit. It has the highest priority. */
-	if(valReg1 & (0b1 << REG1_ACC_LPEN_Pos)) *outMode = LOW_POWER_MODE;
-	else {
-		if(valReg4 & (0b1 << REG4_ACC_HR_Pos)) *outMode = HIGH_RES_POWER_MODE;
-		else *outMode = NORMAL_POWER_MODE;
-	}
-	return true; //Success
-}
-
-/*
- * @brief	Enable Block Data Update for coherent 16-bit reads
- * 			Output registers not updated until MSB and LSB have been read
- */
-bool LSM303AGR_enableBDU_acc(const LSM303AGR_t* lsm303agrStruct){
-	uint8_t readReg4 = 0;
-	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, &readReg4)) return false;
-
-	readReg4 |= (uint8_t)(SET << REG4_ACC_BDU_Pos); //BDU is bit 7
-	return writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, readReg4);
 }
 
 /*
@@ -438,6 +358,95 @@ bool LSM303AGR_getTemperature(const LSM303AGR_t* lsm303agrStruct, float* outTemp
 	}
 	return true; //Success!
 }
+
+/*
+ * ===============================================================
+ * 							OTHERS
+ * ===============================================================
+ */
+/*
+ * @brief	Enable Block Data Update for coherent 16-bit reads
+ * 			Output registers not updated until MSB and LSB have been read
+ */
+bool LSM303AGR_enableBDU_acc(const LSM303AGR_t* lsm303agrStruct){
+	uint8_t readReg4 = 0;
+	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, &readReg4)) return false;
+
+	readReg4 |= (uint8_t)(SET << REG4_ACC_BDU_Pos); //BDU is bit 7
+	return writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, readReg4);
+}
+
+/*
+ * @brief	Set ODR
+ */
+bool LSM303AGR_setODR_acc(const LSM303AGR_t* lsm303agrStruct, ODR_Sel_t odr){
+	uint8_t regVal = 0;
+	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, &regVal)) return false;
+	regVal &= ~(0b1111 << REG1_ACC_ODR_Pos); //Clear the existing bits in the register value
+	regVal |= (odr << REG1_ACC_ODR_Pos); //Set the new value
+	return writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, regVal);
+}
+
+/*
+ * @brief	Set Power Mode
+ */
+bool LSM303AGR_setPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t powerMode){
+	/* Extract the existing bit values from the register CTRL_REG1 */
+	uint8_t ctrlReg1Val = 0;
+	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, &ctrlReg1Val)) return false;
+
+	/* Extract the existing but values from the register CTRL_REG4 */
+	uint8_t ctrlReg4Val = 0;
+	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, &ctrlReg4Val)) return false;
+
+	/* Clear both first */
+	ctrlReg1Val &= (uint8_t) ~(1u << REG1_ACC_LPEN_Pos);
+	ctrlReg4Val &= (uint8_t) ~(1u << REG4_ACC_HR_Pos);
+
+	switch(powerMode){
+		case LOW_POWER_MODE:
+			//To enter Low-Power mode, we only need to SET the LPen bit.
+			ctrlReg1Val |= (0b1 << REG1_ACC_LPEN_Pos);
+			break;
+
+		case NORMAL_POWER_MODE:
+			//To enter Normal mode, we must CLEAR LPen and CLEAR HR bit.
+			break;
+
+		case HIGH_RES_POWER_MODE:
+			//To enter High-Res mode, we must CLEAR LPen, and set HR.
+			ctrlReg4Val |= (0b1 << REG4_ACC_HR_Pos);
+			break;
+
+		default: return false;
+	}
+	return writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, ctrlReg1Val)
+			&& writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, ctrlReg4Val);
+}
+
+/* @brief	Get power mode profile */
+bool LSM303AGR_getPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t* outMode){
+	//Check for NULL pointers
+	if(lsm303agrStruct == NULL || outMode == NULL){
+		return false;
+	}
+
+	//Read the required control registers
+	uint8_t valReg1 = 0;
+	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, &valReg1)) return false;
+
+	uint8_t valReg4 = 0;
+	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, &valReg4)) return false;
+
+	/* Check LPen bit. It has the highest priority. */
+	if(valReg1 & (0b1 << REG1_ACC_LPEN_Pos)) *outMode = LOW_POWER_MODE;
+	else {
+		if(valReg4 & (0b1 << REG4_ACC_HR_Pos)) *outMode = HIGH_RES_POWER_MODE;
+		else *outMode = NORMAL_POWER_MODE;
+	}
+	return true; //Success
+}
+
 
 
 
