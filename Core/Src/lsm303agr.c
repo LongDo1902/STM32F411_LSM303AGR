@@ -7,9 +7,10 @@
 #include "lsm303agr.h"
 /*
  * ==================================================================
- * 					CONSTANTS/PARAMETERS DECLARATION
+ * 					CONSTANTS / DEFAULT REGISTERS
  * ==================================================================
  */
+/* Default values for writable accelerometer registers */
 static const uint8_t LSM303AGR_accDefault[] = {
 		//0x1F -> -0x26
 		TEMP_CFG_REG_A_DF,
@@ -46,6 +47,7 @@ static const uint8_t LSM303AGR_accDefault[] = {
 		ACT_DUR_A_DF
 };
 
+/* Address ranges for writable accelerometer register blocks */
 static const RegSpan_t accSpans[] = {
 		{LSM303AGR_TEMP_CFG_REG_ACC, 8},
 		{LSM303AGR_FIFO_CTRL_REG_ACC, 1},
@@ -55,6 +57,7 @@ static const RegSpan_t accSpans[] = {
 		{LSM303AGR_CLICK_THS_ACC, 6}
 };
 
+/* Default values for writable magnetometer registers */
 static const uint8_t LSM303AGR_magDefault[] = {
 		//0x45 -> 0x4A
 		OFFSET_X_REG_L_M_DF,
@@ -75,6 +78,7 @@ static const uint8_t LSM303AGR_magDefault[] = {
 		INT_THS_H_REG_M_DF
 };
 
+/* Address ranges for writable accelerometer register blocks */
 static const RegSpan_t magSpan[] = {
 		{LSM303AGR_OFFSET_X_REG_L_MAG, 6},
 		{LSM303AGR_CFG_REG_A_MAG, 4},
@@ -82,55 +86,63 @@ static const RegSpan_t magSpan[] = {
 };
 
 /*
- * ==================================================================
- * 					INTERNAL HELPERS OF ACCELEROMETER
- * ==================================================================
+ * ===========================================================================
+ * 			 INTERNAL WRITE AND READ FUNCTIONS OF ACCELEROMETER
+ * ===========================================================================
  */
+/* Write a single accelerometer register */
 static inline bool writeAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t regAddr, uint8_t value){
 	return I2C_writeReg8(lsm303agrStruct -> i2c, lsm303agrStruct -> addrAcc, regAddr, value);
 }
 
+/* Read a single accelerometer register */
 static inline bool readAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t regAddr, uint8_t* outResult){
 	return I2C_readReg8(lsm303agrStruct -> i2c, lsm303agrStruct -> addrAcc, regAddr, outResult);
 }
 
+/* Write multiple consecutive accelerometer registers */
 static inline bool multiWriteAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t startRegAddr, const uint8_t* dataBuf, uint16_t quantityOfReg){
 	uint8_t isIncrement = (quantityOfReg > 1) ? LSM303AGR_ADDR_AUTO_INC : 0u;
 	return I2C_writeBurst(lsm303agrStruct -> i2c, lsm303agrStruct -> addrAcc, startRegAddr, isIncrement, dataBuf, quantityOfReg);
 }
 
+/* Read multiple consecutive accelerometer registers */
 static inline bool multiReadAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t startRegAddr, uint16_t quantityOfReg, uint8_t* outResultBuf){
 	uint8_t isIncrement = (quantityOfReg > 1) ? LSM303AGR_ADDR_AUTO_INC : 0u;
 	return I2C_readBurst(lsm303agrStruct -> i2c, lsm303agrStruct -> addrAcc, startRegAddr, isIncrement, quantityOfReg, outResultBuf);
 }
 
 /*
- * ==================================================================
- * 					INTERNAL HELPERS OF MAGNETOMETER
- * ==================================================================
+ * ==============================================================================
+ * 				INTERNAL WRITE AND READ FUNCTIONS OF MAGNETOMETER
+ * ==============================================================================
  */
+/* Write a single magnetometer register */
 static inline bool writeMag(const LSM303AGR_t* lsm303agrStruct, uint8_t regAddr, uint8_t value){
 	return I2C_writeReg8(lsm303agrStruct -> i2c, lsm303agrStruct -> addrMag, regAddr, value);
 }
 
+/* Read a single magnetometer register */
 static inline bool readMag(const LSM303AGR_t* lsm303agrStruct, uint8_t regAddr, uint8_t* outResult){
 	return I2C_readReg8(lsm303agrStruct -> i2c, lsm303agrStruct -> addrMag, regAddr, outResult);
 }
 
+/* Write multiple consecutive magnetometer registers */
 static inline bool multiWriteMag(const LSM303AGR_t* lsm303agrStruct, uint8_t startRegAddr, const uint8_t* dataBuf, uint16_t quantityOfReg){
 	uint8_t isIncrement = (quantityOfReg > 1) ? LSM303AGR_ADDR_AUTO_INC : 0u;
 	return I2C_writeBurst(lsm303agrStruct -> i2c, lsm303agrStruct -> addrMag, startRegAddr, isIncrement, dataBuf, quantityOfReg);
 }
 
+/* Read multiple consecutive magnetometer registers */
 static inline bool multiReadMag(const LSM303AGR_t* lsm303agrStruct, uint8_t startRegAddr, uint16_t quantityOfReg, uint8_t* outResultBuf){
 	uint8_t isIncrement = (quantityOfReg > 1) ? LSM303AGR_ADDR_AUTO_INC : 0u;
 	return I2C_readBurst(lsm303agrStruct -> i2c, lsm303agrStruct -> addrMag, startRegAddr, isIncrement, quantityOfReg, outResultBuf);
 }
 
 /*
- * ==================================================================
- * 					PUBLIC HELPERS OF ACCELOROMETER
- * ==================================================================
+ * =============================================================================
+ * 					PUBLIC API WRITE AND READ OF MAGNETOMETER
+ * =============================================================================
  */
 bool LSM303AGR_writeAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t regAddr, uint8_t value){
 	return writeAcc(lsm303agrStruct, regAddr, value);
@@ -149,9 +161,9 @@ bool LSM303AGR_multiReadAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t startReg
 }
 
 /*
- * ==================================================================
- * 					PUBLIC HELPERS OF MAGNETOMETER
- * ==================================================================
+ * ================================================================================
+ * 					PUBLIC API WRITE AND READ OF MAGNETOMETER
+ * ================================================================================
  */
 bool LSM303AGR_writeMag(const LSM303AGR_t* lsm303agrStruct, uint8_t regAddr, uint8_t value){
 	return writeMag(lsm303agrStruct, regAddr, value);
@@ -171,10 +183,10 @@ bool LSM303AGR_multiReadMag(const LSM303AGR_t* lsm303agrStruct, uint8_t startReg
 
 /*
  * ==========================================================
- * 					ID VERIFICATION
+ * 					DEVICE IDENTIFICATION
  * ==========================================================
  */
-/* @brief	Returns the WHO_AM_I values of both sub-devices */
+/* @brief	Read WHO_AM_I register for both Accelerometer and Magnetometer */
 bool LSM303AGR_whoAmI(const LSM303AGR_t* lsm303agrStruct, uint8_t* whoAcc, uint8_t* whoMag){
 	if((lsm303agrStruct == NULL) || (whoAcc == NULL) || (whoMag == NULL)) return false;
 
@@ -186,7 +198,7 @@ bool LSM303AGR_whoAmI(const LSM303AGR_t* lsm303agrStruct, uint8_t* whoAcc, uint8
 	return true;
 }
 
-/* @brief	Check if ACC & MAG respond correctly */
+/* @brief	Check whether both sub-devices respond with the correct ID values */
 bool LSM303AGR_isPresent(const LSM303AGR_t* lsm303agrStruct){
 	uint8_t whoAcc = 0u;
 	uint8_t whoMag = 0u;
@@ -197,62 +209,65 @@ bool LSM303AGR_isPresent(const LSM303AGR_t* lsm303agrStruct){
 			(whoMag == LSM303AGR_WHO_AM_I_MAG_VAL));
 }
 
-
 /*
  * ==========================================================
  * 				REBOOT AND RESET BOTH SENSORS
  * ==========================================================
  */
 /*
- * @brief	Reboot accelerometer memory (reload factory trim)
- *			Does not reset user registers.
+ * @brief	Reboot the accelerometer memory (reload factory trim values).
+ * 			This command reinitializes factory calibration data but does NOT reset user-accessible registers.
  */
 static bool rebootAcc(const LSM303AGR_t* lsm303agrStruct){
+	/* Assign regVal to the current value in register CTRL_REG5 */
 	uint8_t regVal = 0;
-	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG5_ACC, &regVal)) return false; //Extract the current status bit-field and assign it to regVal
+	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG5_ACC, &regVal)) return false;
 
-	/* Start to assign and write regVal to CTRL_REG5_ACC to start the reboot process */
+	/* Set the BOOT bit to reload the internal calibration parameters */
 	regVal |= (1u << REG5_ACC_BOOT_Pos);
-	if(!writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG5_ACC, regVal)) return false; // Pass reboot command
-	HAL_Delay(30);
+	if(!writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG5_ACC, regVal)) return false;
+
+	HAL_Delay(50); //Allow time for reboot process to complete
 	return true;
 }
 
 /*
- * @brief	Reboot magnetometer memory (read factory trim)
- * 			Does not reset user registers.
+ * @brief	Reboot the magnetometer memory (reload factory trim values).
+ * 			Like rebootAcc, this command does not affect user registers.
  */
 static bool rebootMag(const LSM303AGR_t* lsm303agrStruct){
+	/* Assign regVal to the current values in register CFG_REG_A_MAG */
 	uint8_t regVal = 0;
-	if(!readMag(lsm303agrStruct, LSM303AGR_CFG_REG_A_MAG, &regVal)) return false; //Extract the current status bit-field and assign it to regVal
+	if(!readMag(lsm303agrStruct, LSM303AGR_CFG_REG_A_MAG, &regVal)) return false;
 
-	/* SET REBOOT bit in CFG_REG_A_MAG to start the magnetometer reboot procecss */
+	/* Set the BOOT bit to reload the internal calibration parameters */
 	regVal |= (1u << REG_A_REBOOT_Pos);
-	if(!writeMag(lsm303agrStruct, LSM303AGR_CFG_REG_A_MAG, regVal)) return false; //Pass reboot command
-	HAL_Delay(30);
+	if(!writeMag(lsm303agrStruct, LSM303AGR_CFG_REG_A_MAG, regVal)) return false;
+
+	HAL_Delay(50); //Allow time for reboot process to complete
 	return true;
 }
 
 /*
- * @brief	Manually restore accelerometer user registers to power-up defaults.
- * 			Writes only contiguous R/W spans; skips Read Only and Reserved area
+ * @brief	Restore all writable accelerometer registers to their power-up default values.
+ * 			This manually writes contiguous writable register blocks defined in accSpans[] and skips read-only or reserved registers
  */
 static bool restoreAccDefaults(const LSM303AGR_t* lsm303agrStruct){
-	const uint8_t* p = LSM303AGR_accDefault; //Separate pointer variable
+	const uint8_t* p = LSM303AGR_accDefault; //Separate pointer variable, valid in C
 
 	for(size_t i = 0; i < ARRLEN(accSpans); i++){
 		if(!multiWriteAcc(lsm303agrStruct, accSpans[i].startReg, p, accSpans[i].len)) return false;
-		//Move/update pointer p by accSpans[i].len
-		p += accSpans[i].len;
+		p += accSpans[i].len; //Advance pointer to next data segment in LSM303AGR_accDefault array
 	}
 	return true;
 }
 
 /*
- * @brief	Manually restore magnetometer user registers to power-up defaults
+ * @brief	Restore all writable magnetometer registers to their power-up default values.
+ * 			Write contiguous writable blocks defined in magSpan[].
  */
 static bool restoreMagDefaults(const LSM303AGR_t* lsm303agrStruct){
-	const uint8_t* p = LSM303AGR_magDefault; //Separate pointer variable
+	const uint8_t* p = LSM303AGR_magDefault; //Separate pointer variable, valid in C
 
 	for(size_t i = 0; i < ARRLEN(magSpan); i++){
 		if(!multiWriteMag(lsm303agrStruct, magSpan[i].startReg, p, magSpan[i].len)) return false;
@@ -262,87 +277,95 @@ static bool restoreMagDefaults(const LSM303AGR_t* lsm303agrStruct){
 }
 
 /*
- * @brief	SET reset bit
+ * @brief	Perform a full chip soft reset (via magnetometer CFG_REG_A)
+ * 			Sets the SOFT_RST bit to reset both Accel and Mag internal logic and registers.
  */
 static bool activateSoftReset(const LSM303AGR_t* lsm303agrStruct){
 	uint8_t regVal = 0;
-	if(!readMag(lsm303agrStruct, LSM303AGR_CFG_REG_A_MAG, &regVal)) return false; //Extract the current status bit-field and assign it to regVal
+	if(!readMag(lsm303agrStruct, LSM303AGR_CFG_REG_A_MAG, &regVal)) return false;
 
-	/* Start to assign and write regVal to CFG_REG_A to start FULL CHIP RESET */
+	/* Set SOFT_RST bit to initiate full-chip reset	 */
 	regVal |= (1u << REG_A_SOFT_RST_Pos);
 	if(!writeMag(lsm303agrStruct, LSM303AGR_CFG_REG_A_MAG, regVal)) return false;
-	HAL_Delay(30);
+
+	HAL_Delay(50); //Wait for internal reset to finish
 	return true;
 }
 
 /*
- * @brief	Public helper for rebooting and resetting LSM303AGR registers to default values
- * 			FULL software reset:
- * 				1. Reboot accel and mag (factory trim reload)
- * 				2. SOFT_RST
- * 				3. MANUALLY write accel and mag defauls to user registers
+ * @brief	Perform a complete software reset sequence for both sensors
+ * 			This function executes:
+ * 				1. Reboot accel and mag (reload factory trims)
+ * 				2. Activate SOFT_RST bit for global reset
+ * 				3. Rewrite all user registers with their default values.
+ *
+ * @note	After reset, all sensor configurations (ODR, scale, power mode) must be reconfigured before normal operation.
  */
 bool LSM303AGR_softReset(const LSM303AGR_t* lsm303agrStruct){
-	/* Reboot the memory content of Acc and Mag	 */
 	if(!rebootAcc(lsm303agrStruct)) return false;
 	if(!rebootMag(lsm303agrStruct)) return false;
-
-	/* Enable soft-reset */
 	if(!activateSoftReset(lsm303agrStruct)) return false;
-
-	/* Manually reset Acc and Mag to Default Values */
 	if(!restoreAccDefaults(lsm303agrStruct)) return false;
 	if(!restoreMagDefaults(lsm303agrStruct)) return false;
-
 	return true;
 }
 
 /*
- * ==========================================================
- * 			   DISABLE AND ENABLE TEMPERATURE
- * ==========================================================
+ * =================================================================
+ * 			   			TEMPERATURE CONTROL
+ * =================================================================
  */
 /*
- * @brief	Disable internal temperature sensor
+ * @brief	Disable the internal temperature sensor of the accelerometer block
  */
 bool LSM303AGR_disableTemperature(const LSM303AGR_t* lsm303agrStruct){
 	uint8_t val;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_TEMP_CFG_REG_ACC, &val)) return false;
+
+	/* Clear temperature enable bits [1:0] */
 	val &= ~(3u << TEMP_ACC_ENABLE_Pos);
 	return writeAcc(lsm303agrStruct, LSM303AGR_TEMP_CFG_REG_ACC, val);
 }
 
 /*
- * @brief	Enable the internal temperature sensor
+ * @brief	Enable the internal temperature sensor of the accelerometer block
  */
 bool LSM303AGR_enableTemperature(const LSM303AGR_t* lsm303agrStruct){
 	uint8_t val;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_TEMP_CFG_REG_ACC, &val)) return false;
+
+	/* Set temperature enable bits [1:0] to 1 (temperature measurement ON) */
 	val = (val & ~(3u << TEMP_ACC_ENABLE_Pos)) | (3u << TEMP_ACC_ENABLE_Pos);
 	return writeAcc(lsm303agrStruct, LSM303AGR_TEMP_CFG_REG_ACC, val);
 }
 
 /*
- * @brief	Read Temperature value
+ * @brief	Read and convert raw temperature data to degrees Celcius
+ *
+ * @param	outTempC	Pointer to store computed temperature in C
+ *
+ * @note	Conversion method depends on the current power mode:
+ * 				- Low Power Mode: 8-bit resolution
+ * 				- Normal Mode: 10-bit resolution
+ * 				- High-Res Mode: 12-bit resolution
  */
 bool LSM303AGR_getTemperature(const LSM303AGR_t* lsm303agrStruct, float* outTempC){
-	//Declare
 	int8_t raw_8_val = 0;
 	int16_t raw_10_val = 0;
 	int16_t raw_12_val = 0;
 	int16_t raw_16_val = 0;
 
-	/* Check for NULL pointer */
 	if((lsm303agrStruct == NULL) || (outTempC == NULL)) return false;
-	/* Get the current power mode */
+
+	/* Identify the current power mode for correct scaling */
 	PowerMode_t currentMode;
 	if(!LSM303AGR_getPowerMode(lsm303agrStruct, &currentMode)) return false;
 
-	/* Read the raw temperature data */
+	/* Read raw temperature output (2 bytes: LSB, MSB) */
 	uint8_t temperatureBuf[2];
 	if(!multiReadAcc(lsm303agrStruct, LSM303AGR_OUT_TEMP_L_ACC, sizeof(temperatureBuf), temperatureBuf)) return false;
 
-	/* Process temperature value base on the power mode */
+	/* Decode temperature values based on power mode */
 	switch(currentMode){
 		case LOW_POWER_MODE:
 			//Use the 8-bit formula for Low-Power mode
@@ -365,50 +388,54 @@ bool LSM303AGR_getTemperature(const LSM303AGR_t* lsm303agrStruct, float* outTemp
 
 		default: return false;
 	}
-	return true; //Success!
+	return true;
 }
 
 /*
  * ===============================================================
- * 							OTHERS
+ * 						MISCELLANEOUS
  * ===============================================================
  */
 /*
- * @brief	Enable Block Data Update for coherent 16-bit reads
- * 			Output registers not updated until MSB and LSB have been read
+ * @brief	Enable Block Data Update (BDU) for consistent 16-bit data reads.
+ *
+ * @note	When BDU is enabled, output registers are not updated until both the LSB and MSB have beed read, ensuring coherent readings.
  */
 bool LSM303AGR_enableBDU_acc(const LSM303AGR_t* lsm303agrStruct){
 	uint8_t readReg4 = 0;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, &readReg4)) return false;
 
-	readReg4 |= (uint8_t)(1u << REG4_ACC_BDU_Pos); //BDU is bit 7
+	readReg4 |= (uint8_t)(1u << REG4_ACC_BDU_Pos); //SET BDU bit (bit 7)
 	return writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, readReg4);
 }
 
 /*
- * @brief	Set ODR
+ * @brief	Configure accelerometer Output Data Rate (ODR)
  */
 bool LSM303AGR_setODR_acc(const LSM303AGR_t* lsm303agrStruct, ODR_Sel_t odr){
 	uint8_t regVal = 0;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, &regVal)) return false;
+
 	regVal &= ~(0xFu << REG1_ACC_ODR_Pos); //Clear ODR bits [7:4]
 	regVal |= (odr << REG1_ACC_ODR_Pos); //Set the new value
 	return writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, regVal);
 }
 
 /*
- * @brief	Set Power Mode
+ * @brief	Configure accelerometer power mode (Low, Normal, or High-Res)
+ *
+ * @note	LPen (CTRL_REG1) enables Low Power Mode
+ * 			HR (CTRL_REG4) enables High-Res Mode
+ * 			Both cleared -> Normal mode
  */
 bool LSM303AGR_setPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t powerMode){
-	/* Extract the existing bit values from the register CTRL_REG1 */
 	uint8_t ctrlReg1Val = 0;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, &ctrlReg1Val)) return false;
 
-	/* Extract the existing but values from the register CTRL_REG4 */
 	uint8_t ctrlReg4Val = 0;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, &ctrlReg4Val)) return false;
 
-	/* Clear both first */
+	/* Clear LPen and HR bits first */
 	ctrlReg1Val &= (uint8_t) ~(1u << REG1_ACC_LPEN_Pos);
 	ctrlReg4Val &= (uint8_t) ~(1u << REG4_ACC_HR_Pos);
 
@@ -429,79 +456,88 @@ bool LSM303AGR_setPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t powe
 
 		default: return false;
 	}
-	return writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, ctrlReg1Val)
-			&& writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, ctrlReg4Val);
+	return	writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, ctrlReg1Val) &&
+			writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, ctrlReg4Val);
 }
 
-/* @brief	Get power mode profile */
+/*
+ * @brief	Retrieve the currently active power mode
+ */
 bool LSM303AGR_getPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t* outMode){
-	//Check for NULL pointers
 	if(lsm303agrStruct == NULL || outMode == NULL){
 		return false;
 	}
 
-	//Read the required control registers
 	uint8_t valReg1 = 0;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, &valReg1)) return false;
 
 	uint8_t valReg4 = 0;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, &valReg4)) return false;
 
-	/* Check LPen bit. It has the highest priority. */
-	if(valReg1 & (1u << REG1_ACC_LPEN_Pos)) *outMode = LOW_POWER_MODE;
-	else {
+	/* Check LPen bit which has priority over HR bit */
+	if(valReg1 & (1u << REG1_ACC_LPEN_Pos)){
+		*outMode = LOW_POWER_MODE;
+	} else {
 		if(valReg4 & (1u << REG4_ACC_HR_Pos)) *outMode = HIGH_RES_POWER_MODE;
 		else *outMode = NORMAL_POWER_MODE;
 	}
-	return true; //Success
+	return true;
 }
 
-/* @brief	Check if there is new available XYZ data */
+/*
+ * ========================================================================
+ * 						READ ACCELEROMETER MEASUREMENT
+ * ========================================================================
+ */
+/*
+ * @brief	Check if new accelerometer XYZ data is available
+ */
 bool LSM303AGR_isXYZ_available(const LSM303AGR_t* lsm303agrStruct){
 	uint8_t val = 0;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_STATUS_REG_ACC, &val)) return false;
 
-	//Extract bit 3
 	return ((val >> XYZDA_Pos) & 0x01);
 }
 
 /*
- * ===================================================
- * 			READ ACCELEROMETER MEASUREMENT
- * ===================================================
- */
-/*
- * @brief	Enabling XYZ axes
+ * @brief	Enablle all three accelerometer axes (X, Y, Z)
  */
 bool LSM303AGR_XYZ_enable(const LSM303AGR_t* lsm303agrStruct){
 	uint8_t val = 0;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, &val)) return false;
-	val = (val & ~(0x7u << REG1_ACC_XEN_Pos)) | (0x7u << REG1_ACC_XEN_Pos); //Enable XYZ axes
+
+	/* Set bits [2:0] to enable X, Y, Z axes */
+	val = (val & ~(0x7u << REG1_ACC_XEN_Pos)) | (0x7u << REG1_ACC_XEN_Pos);
 	return writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, val);
 }
 
 /*
- * @brief	Configure Full Scale from 2g to 16g for Accelerometer sensor
+ * @brief	Configure full-scale range (±2g, ±4g, ±8g, or ±16g)
  */
 bool LSM303AGR_setFullScale(const LSM303AGR_t* lsm303agrStruct, FullScale_t selectFullScale){
 	uint8_t val = 0;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, &val)) return false;
-	val = (val & ~(0x3u << REG4_ACC_FS_Pos)) | (selectFullScale << REG4_ACC_FS_Pos); //clear bits [5:4] then insert new full-scale selection
+
+	val = (val & ~(0x3u << REG4_ACC_FS_Pos)) | (selectFullScale << REG4_ACC_FS_Pos);
 	return writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, val);
 }
 
 /*
- * @brief	Extract/get the selected Full Scale configuration
+ * @brief	Retrieve currently configured full-scale range
  */
 bool LSM303AGR_getFullScale(const LSM303AGR_t* lsm303agrStruct, FullScale_t* whichFullScale){
 	uint8_t val = 0;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, &val)) return false;
+
 	*whichFullScale = (FullScale_t)((val >> REG4_ACC_FS_Pos) & 0x3u);
 	return true;
 }
 
+/*
+ * @brief	Get sensitivity in mg/LSB according to power mode and full-scale setting
+ */
 static bool getSensitivity_mgLSB(const LSM303AGR_t* lsm303agrStruct, float* outSensitivity){
-	/* Retrieve Full scale configuration	 */
+	/* Retrieve Full scale configuration */
 	FullScale_t whichFullScale;
 	if(!LSM303AGR_getFullScale(lsm303agrStruct, &whichFullScale)) return false;
 
@@ -509,6 +545,7 @@ static bool getSensitivity_mgLSB(const LSM303AGR_t* lsm303agrStruct, float* outS
 	PowerMode_t whichPowerMode;
 	if(!LSM303AGR_getPowerMode(lsm303agrStruct, &whichPowerMode)) return false;
 
+	/* Lookup table derived from LSM303AGR datasheet */
 	switch(whichPowerMode){
 		case HIGH_RES_POWER_MODE:
 			switch(whichFullScale){
@@ -545,11 +582,17 @@ static bool getSensitivity_mgLSB(const LSM303AGR_t* lsm303agrStruct, float* outS
 }
 
 /*
- * @brief	Read raw values/counts from Accelerometer
+ * @brief	Read raw accelerometer output (16-bit signed) from X, Y, Z axes
+ *
+ * @param	rawAccBuf	Destination buffer for raw signed data (3 elements)
+ *
+ * @note	Function waits until new data is available before reading.
  */
 bool LSM303AGR_readRawAcc(const LSM303AGR_t* lsm303agrStruct, int16_t rawAccBuf[3]){
 	if(lsm303agrStruct == NULL) return false;
-	while(!LSM303AGR_isXYZ_available(lsm303agrStruct)); //Wait until the new data is available
+
+	/* Wait until new XYZ data is ready */
+	while(!LSM303AGR_isXYZ_available(lsm303agrStruct));
 	uint8_t rawBuf[6];
 
 	//Read 6 consecutive bytes: X_L, X_H, Y_L, Y_H, Z_L, Z_H
@@ -631,13 +674,3 @@ bool LSM303AGR_readAcc_mg(const LSM303AGR_t* lsm303agrStruct, float outAcc_XYZ[3
 
 	return true;
 }
-
-
-
-
-
-
-
-
-
-
