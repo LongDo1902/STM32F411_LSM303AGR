@@ -40,19 +40,25 @@ static const LSM303AGR_t lsm303agrConfig = {
  * 					PARAMETERS DECLARATIONS
  * ===============================================================
  */
-uint8_t tempAddrVal = 0;
-uint8_t bduAddrVal = 0;
+
+/*
+ * Temperature related parameter declaration
+ */
 float lsm303agr_temperature = 0.0;
-uint8_t ctrlReg2 = 0;
-uint8_t referenceDataCapture = 0;
 
-uint8_t dataOutBuf[6];
+/*
+ * Raw, offset and converted parameters of Accelerometer
+ */
+#define CALIBRATE_SAMPLE 6
+int16_t rawAccX[CALIBRATE_SAMPLE], rawAccY[CALIBRATE_SAMPLE], rawAccZ[CALIBRATE_SAMPLE];
+int32_t offsetRawX, offsetRawY, offsetRawZ;
+float outAcc_XYZ[3];
 
-bool isRead1Ok = false;
-bool isRead2Ok = false;
-bool isMultiReadOk = false;
-
-
+/*
+ * ================================================================
+ * 						MAIN THINGS HAPPEN
+ * ================================================================
+ */
 int main(void){
 	HAL_Init();
 	ledsInit();
@@ -66,18 +72,33 @@ int main(void){
 	LSM303AGR_softReset(&lsm303agrConfig);
 	HAL_Delay(5);
 
-	/* Set the Output Data Rate */
+	/* Set the Output Data Rate to 400Hz */
 	if(!LSM303AGR_setODR_acc(&lsm303agrConfig, _400Hz)) return false;
 	HAL_Delay(5);
 
-	/* Enable BDU and Temperature */
-	if(!LSM303AGR_enableTemperature(&lsm303agrConfig)) return false;
-	HAL_Delay(5);
+	/* Enable BDU and Temperature before reading temperature */
 	if(!LSM303AGR_enableBDU_acc(&lsm303agrConfig)) return false;
 	HAL_Delay(5);
 
+	if(!LSM303AGR_enableTemperature(&lsm303agrConfig)) return false;
+	HAL_Delay(5);
+
+	/* Set the sensor to Normal Power Mode */
+	if(!LSM303AGR_setPowerMode(&lsm303agrConfig, NORMAL_POWER_MODE)) return false;
+	HAL_Delay(5);
+
+	/* Enabling XYZ axes */
+	if(!LSM303AGR_XYZ_enable(&lsm303agrConfig)) return false;
+	HAL_Delay(5);
+
+	/* Configure Full Scale */
+	if(!LSM303AGR_setFullScale(&lsm303agrConfig, _4g)) return false;
+	HAL_Delay(5);
+
+	if(!LSM303AGR_accCalibrate(&lsm303agrConfig, CALIBRATE_SAMPLE, rawAccX, rawAccY, rawAccZ, &offsetRawX, &offsetRawY, &offsetRawZ)) return false;
+
 	while(1){
-		LSM303AGR_getTemperature(&lsm303agrConfig, &lsm303agr_temperature);
-		HAL_Delay(250);
+		if(!LSM303AGR_readAcc_mg(&lsm303agrConfig, outAcc_XYZ)) return false;
+		HAL_Delay(100);
 	}
 }

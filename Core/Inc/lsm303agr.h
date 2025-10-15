@@ -15,6 +15,8 @@
 
 #include "i2c.h"
 
+#define ARRLEN(x) (sizeof(x)/sizeof((x)[0]))
+
 /*
  * =======================================================================
  * 						I2C ADDRESSES & WHO AM I
@@ -149,6 +151,16 @@
 /* CTRL_REG5_ACC */
 #define REG5_ACC_BOOT_Pos		7
 
+/* STATUS_REG_A */
+#define XDA_Pos					0
+#define YDA_Pos					1
+#define ZDA_Pos					2
+#define XYZDA_Pos				3
+#define XOR_Pos					4
+#define YOR_Pos					5
+#define ZOR_Pos					6
+#define XYZOR_Pos				7
+
 /* CFG_REG_A_MAG */
 #define REG_A_MD_Pos			0
 #define REG_A_ODR_Pos			2
@@ -174,6 +186,13 @@ typedef enum{
 	_1K620Hz = 0x8, //Low-power mode
 	_1344HR_5376LP = 0x9 //HR/Normal mode or Low power mode
 }ODR_Sel_t;
+
+typedef enum{
+	_2g = 0x0u,
+	_4g = 0x1u,
+	_8g = 0x2u,
+	_16g = 0x3u
+}FullScale_t;
 
 /*
  * ===============================================================
@@ -232,8 +251,6 @@ typedef struct{
 	uint8_t len;
 } RegSpan_t;
 
-#define ARRLEN(x) (sizeof(x)/sizeof((x)[0]))
-
 /*
  * ===============================================================
  * 					POWER MODE SELECTIONS
@@ -256,6 +273,21 @@ typedef struct {
 	uint8_t 			addrAcc;	//Accelerometer 7-bit address (default: 0x19U)
 	uint8_t 			addrMag;	//Magnometer 7-bit address (default: 0x1EU)
 }LSM303AGR_t;
+
+/*
+ * ==========================================================
+ * 				STATUS REG A
+ * ==========================================================
+ */
+typedef enum{
+	Y_AVAILABLE,
+	Z_AVAILABLE,
+	XYZ_AVAILABLE,
+	X_OVERRUN,
+	Y_OVERRUN,
+	Z_OVERRUN,
+	XYZ_OVERRUN
+}XYZ_Status_t;
 
 /*
  * ======================================================================
@@ -287,6 +319,19 @@ bool LSM303AGR_getPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t* out
 
 bool LSM303AGR_getTemperature(const LSM303AGR_t* lsm303agrStruct, float* outTempC);
 
+bool LSM303AGR_isXYZ_available(const LSM303AGR_t* lsm303agrStruct);
+bool LSM303AGR_XYZ_enable(const LSM303AGR_t* lsm303agrStruct);
+bool LSM303AGR_setFullScale(const LSM303AGR_t* lsm303agrStruct, FullScale_t selectFullScale);
+bool LSM303AGR_readRawAcc(const LSM303AGR_t* lsm303agrStruct, int16_t rawAccBuf[3]);
+bool LSM303AGR_accCalibrate(const LSM303AGR_t* lsm303agrStruct,
+							int32_t sample,
+							int16_t* outX,
+							int16_t* outY,
+							int16_t* outZ,
+							int32_t* offsetX,
+							int32_t* offsetY,
+							int32_t* offsetZ);
+bool LSM303AGR_readAcc_mg(const LSM303AGR_t* lsm303agrStruct, float outAcc_XYZ[3]);
 
 #endif /* INC_LSM303AGR_H_ */
 
