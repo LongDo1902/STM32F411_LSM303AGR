@@ -412,12 +412,18 @@ bool LSM303AGR_enableBDU(const LSM303AGR_t* lsm303agrStruct){
 /*
  * @brief	Configure accelerometer Output Data Rate (ODR)
  */
-bool LSM303AGR_setODR(const LSM303AGR_t* lsm303agrStruct, ODR_Sel_t odr){
+bool LSM303AGR_setODR(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, ODR_Sel_t odr){
 	uint8_t regVal = 0;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, &regVal)) return false;
 
 	regVal &= ~(0xFu << REG1_ACC_ODR_Pos); //Clear ODR bits [7:4]
 	regVal |= (odr << REG1_ACC_ODR_Pos); //Set the new value
+
+	/* Save the ODR selection to ODR_sel field in the struct */
+	if(lsm303agrState){
+		lsm303agrState -> ODR_sel = odr;
+		lsm303agrState -> isODRSet = true; //Trigger this field to true to indicate it has been set successfully
+	}
 	return writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, regVal);
 }
 
@@ -428,7 +434,7 @@ bool LSM303AGR_setODR(const LSM303AGR_t* lsm303agrStruct, ODR_Sel_t odr){
  * 			HR (CTRL_REG4) enables High-Res Mode
  * 			Both cleared -> Normal mode
  */
-bool LSM303AGR_setPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t powerMode){
+bool LSM303AGR_setPowerMode(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, PowerMode_t powerMode){
 	uint8_t ctrlReg1Val = 0;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, &ctrlReg1Val)) return false;
 
@@ -456,6 +462,14 @@ bool LSM303AGR_setPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t powe
 
 		default: return false;
 	}
+
+	/* Save power mode to the struct */
+	if(lsm303agrState){
+		lsm303agrState -> powerModeSel = powerMode;
+		lsm303agrState -> isPowerModeSet = true; //Trigger this field to true to indicate it has been set successfully
+		lsm303agrState -> isCalibrated = false; //Recommend re-calibration
+	}
+
 	return	writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, ctrlReg1Val) &&
 			writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, ctrlReg4Val);
 }
@@ -514,11 +528,18 @@ bool LSM303AGR_enableXYZ(const LSM303AGR_t* lsm303agrStruct){
 /*
  * @brief	Configure full-scale range (±2g, ±4g, ±8g, or ±16g)
  */
-bool LSM303AGR_setFullScale(const LSM303AGR_t* lsm303agrStruct, FullScale_t selectFullScale){
+bool LSM303AGR_setFullScale(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, FullScale_t selectFullScale){
 	uint8_t val = 0;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, &val)) return false;
 
 	val = (val & ~(0x3u << REG4_ACC_FS_Pos)) | (selectFullScale << REG4_ACC_FS_Pos);
+
+	/* Save the full scale selection to the struct */
+	if(lsm303agrState){
+		lsm303agrState -> fullScaleSel = selectFullScale;
+		lsm303agrState -> isFullScaleSet = true; //Indicate full-scale is set successfully
+		lsm303agrState -> isCalibrated = false; //Recommend re-calibration
+	}
 	return writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, val);
 }
 
@@ -539,11 +560,6 @@ bool LSM303AGR_getFullScale(const LSM303AGR_t* lsm303agrStruct, FullScale_t* whi
 static bool getSensitivity_mgLSB(const LSM303AGR_t* lsm303agrStruct,
 								 LSM303AGR_State_t* lsm303agrState,
 								 float* outSensitivity){
-	/* Retrieve Full scale configuration */
-	if(!LSM303AGR_getFullScale(lsm303agrStruct, &lsm303agrState -> fullScaleSel)) return false;
-
-	/* Retrieve Power Mode configuration */
-	if(!LSM303AGR_getPowerMode(lsm303agrStruct, &lsm303agrState -> powerModeSel)) return false;
 
 	/* Lookup table derived from LSM303AGR datasheet */
 	switch(lsm303agrState -> powerModeSel){
@@ -578,6 +594,7 @@ static bool getSensitivity_mgLSB(const LSM303AGR_t* lsm303agrStruct,
 			break;
 		default: return false;
 	}
+	if(lsm303agrState) lsm303agrState -> isAccSensitivitySet = true; //Indicate acc sensitivity is set successfully
 	return true;
 }
 
@@ -691,6 +708,8 @@ bool LSM303AGR_accCalibrate(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_
  * @brief	Get the readable/converted Accelerometer measurement.
  */
 bool LSM303AGR_readAcc_mg(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, float outAcc_XYZ[3]){
+	if((!lsm303agrState -> isPowerModeSet) || (!lsm303agrState -> isFullScaleSet)) return false;
+
 	/* Check if calibration is done, if not, start to calibrate and take 300 samples as default	 */
 	if((lsm303agrState -> isCalibrated) == false) LSM303AGR_accCalibrate(lsm303agrStruct, lsm303agrState, 200);
 	int32_t _offsetAccX = lsm303agrState -> offsetAccX;
@@ -700,17 +719,12 @@ bool LSM303AGR_readAcc_mg(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t*
 	int16_t raw[3];
 	if(!LSM303AGR_readRawAcc(lsm303agrStruct, raw)) return false;
 
-	PowerMode_t pwMode;
-	if(!LSM303AGR_getPowerMode(lsm303agrStruct, &pwMode)) return false;
-
-	uint8_t shiftNum = (pwMode == HIGH_RES_POWER_MODE) ? 4 : (pwMode == NORMAL_POWER_MODE) ? 6 : 8;
+	uint8_t shiftNum = (lsm303agrState -> powerModeSel == HIGH_RES_POWER_MODE) ? 4 : (lsm303agrState -> powerModeSel == NORMAL_POWER_MODE) ? 6 : 8;
 
 	/* Sign preserving right bit shift */
 	int32_t rawCalibratedX = ((int32_t)raw[0] - _offsetAccX) >> shiftNum;
 	int32_t rawCalibratedY = ((int32_t)raw[1] - _offsetAccY) >> shiftNum;
 	int32_t rawCalibratedZ = ((int32_t)raw[2] - _offsetAccZ) >> shiftNum;
-
-	if(!getSensitivity_mgLSB(lsm303agrStruct, lsm303agrState, &lsm303agrState -> accSensitivity)) return false;
 
 	outAcc_XYZ[0] = (float)(rawCalibratedX * lsm303agrState -> accSensitivity);
 	outAcc_XYZ[1] = (float)(rawCalibratedY * lsm303agrState -> accSensitivity);

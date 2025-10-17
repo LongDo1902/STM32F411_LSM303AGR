@@ -62,7 +62,7 @@ float lsm303agr_temperature = 0.0;
 /*
  * Raw, offset and converted parameters of Accelerometer
  */
-#define CALIBRATE_SAMPLE 200
+#define CALIBRATE_SAMPLE 100
 float outAcc_XYZ[3];
 
 /*
@@ -98,7 +98,7 @@ int main(void){
 	HAL_Delay(5);
 
 	/* Set the Output Data Rate to 400Hz */
-	if(!LSM303AGR_setODR(&lsm303agrConfig, _400Hz)) return false;
+	if(!LSM303AGR_setODR(&lsm303agrConfig, &lsm303agrState, _400Hz)) return false;
 	HAL_Delay(5);
 
 	/* Enable BDU */
@@ -106,7 +106,7 @@ int main(void){
 	HAL_Delay(5);
 
 	/* Set the sensor to Normal Power Mode */
-	if(!LSM303AGR_setPowerMode(&lsm303agrConfig, NORMAL_POWER_MODE)) return false;
+	if(!LSM303AGR_setPowerMode(&lsm303agrConfig, &lsm303agrState, NORMAL_POWER_MODE)) return false;
 	HAL_Delay(5);
 
 	/* Enabling XYZ axes */
@@ -114,7 +114,7 @@ int main(void){
 	HAL_Delay(5);
 
 	/* Configure Full Scale */
-	if(!LSM303AGR_setFullScale(&lsm303agrConfig, _4g)) return false;
+	if(!LSM303AGR_setFullScale(&lsm303agrConfig, &lsm303agrState, _4g)) return false;
 	HAL_Delay(5);
 
 	if(!LSM303AGR_accCalibrate(&lsm303agrConfig, &lsm303agrState, CALIBRATE_SAMPLE)) return false;
@@ -132,6 +132,6 @@ int main(void){
 
 	while(1){
 		if(!LSM303AGR_readAcc_mg(&lsm303agrConfig, &lsm303agrState, outAcc_XYZ)) return false;
-		HAL_Delay(250);
+		HAL_Delay(300);
 	}
 }

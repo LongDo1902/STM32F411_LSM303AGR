@@ -280,6 +280,11 @@ typedef struct{
 	FullScale_t fullScaleSel;
 	PowerMode_t powerModeSel;
 	float 		accSensitivity;
+
+	bool	isODRSet;
+	bool	isFullScaleSet;
+	bool	isPowerModeSet;
+	bool	isAccSensitivitySet;
 }LSM303AGR_State_t;
 
 /*
@@ -343,12 +348,12 @@ bool LSM303AGR_getTemperature(const LSM303AGR_t* lsm303agrStruct, float* outTemp
  * ================================================================================
  */
 bool LSM303AGR_enableBDU(const LSM303AGR_t* lsm303agrStruct);
-bool LSM303AGR_setODR(const LSM303AGR_t* lsm303agrStruct, ODR_Sel_t odr);
-bool LSM303AGR_setPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t powerMode);
+bool LSM303AGR_setODR(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, ODR_Sel_t odr);
+bool LSM303AGR_setPowerMode(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, PowerMode_t powerMode);
 bool LSM303AGR_getPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t* outMode);
 bool LSM303AGR_isXYZ_available(const LSM303AGR_t* lsm303agrStruct);
 bool LSM303AGR_enableXYZ(const LSM303AGR_t* lsm303agrStruct);
-bool LSM303AGR_setFullScale(const LSM303AGR_t* lsm303agrStruct, FullScale_t selectFullScale);
+bool LSM303AGR_setFullScale(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, FullScale_t selectFullScale);
 bool LSM303AGR_getFullScale(const LSM303AGR_t* lsm303agrStruct, FullScale_t* whichFullScale);
 
 /*
