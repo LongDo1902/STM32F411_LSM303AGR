@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <math.h>
 
 #include "i2c.h"
 
@@ -249,7 +250,7 @@ typedef enum{
 typedef struct{
 	uint8_t startReg;
 	uint8_t len;
-} RegSpan_t;
+}RegSpan_t;
 
 /*
  * ===============================================================
@@ -263,16 +264,23 @@ typedef enum{
 	HIGH_RES_POWER_MODE = 2
 }PowerMode_t;
 
-/*
- * ==========================================================
- *					BUS & PIN SELECTION
- * ==========================================================
- */
 typedef struct {
 	I2C_GPIO_Config_t	i2c;	//Bus/pin selection
 	uint8_t 			addrAcc;	//Accelerometer 7-bit address (default: 0x19U)
 	uint8_t 			addrMag;	//Magnometer 7-bit address (default: 0x1EU)
 }LSM303AGR_t;
+
+typedef struct{
+	int32_t 	offsetAccX;
+	int32_t 	offsetAccY;
+	int32_t 	offsetAccZ;
+	bool 		isCalibrated;
+
+	ODR_Sel_t	ODR_sel;
+	FullScale_t fullScaleSel;
+	PowerMode_t powerModeSel;
+	float 		accSensitivity;
+}LSM303AGR_State_t;
 
 /*
  * ==========================================================
@@ -291,11 +299,9 @@ typedef enum{
 
 /*
  * ======================================================================
- * 					FUNCTION DECLARATIONS
+ * 						WRITE AND READ FUNCTIONS
  * ======================================================================
  */
-bool LSM303AGR_whoAmI(const LSM303AGR_t* lsm303agrStruct, uint8_t* whoAcc, uint8_t* whoMag);
-bool LSM303AGR_isPresent(const LSM303AGR_t* lsm303agrStruct);
 
 bool LSM303AGR_writeAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t regAddr, uint8_t value);
 bool LSM303AGR_readAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t regAddr, uint8_t* outResult);
@@ -307,31 +313,52 @@ bool LSM303AGR_readMag(const LSM303AGR_t* lsm303agrStruct, uint8_t regAddr, uint
 bool LSM303AGR_multiWriteMag(const LSM303AGR_t* lsm303agrStruct, uint8_t startRegAddr, const uint8_t* dataBuf, uint16_t quantityOfReg);
 bool LSM303AGR_multiReadMag(const LSM303AGR_t* lsm303agrStruct, uint8_t startRegAddr, uint16_t quantityOfReg, uint8_t* outResultBuf);
 
+/*
+ * ================================================================================
+ * 							IDENTIFICATION HELPERS
+ * ================================================================================
+ */
+bool LSM303AGR_whoAmI(const LSM303AGR_t* lsm303agrStruct, uint8_t* whoAcc, uint8_t* whoMag);
+bool LSM303AGR_isPresent(const LSM303AGR_t* lsm303agrStruct);
+
+/*
+ * ================================================================================
+ * 							WHOLE SENSOR RESET
+ * ================================================================================
+ */
 bool LSM303AGR_softReset(const LSM303AGR_t* lsm303agrStruct);
 
+/*
+ * ================================================================================
+ * 							TEMPERATURE CONTROL
+ * ================================================================================
+ */
 bool LSM303AGR_disableTemperature(const LSM303AGR_t* lsm303agrStruct);
 bool LSM303AGR_enableTemperature(const LSM303AGR_t* lsm303agrStruct);
-bool LSM303AGR_enableBDU_acc(const LSM303AGR_t* lsm303agrStruct);
-
-bool LSM303AGR_setODR_acc(const LSM303AGR_t* lsm303agrStruct, ODR_Sel_t odr);
-bool LSM303AGR_setPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t powerMode);
-bool LSM303AGR_getPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t* outMode);
-
 bool LSM303AGR_getTemperature(const LSM303AGR_t* lsm303agrStruct, float* outTempC);
 
+/*
+ * ================================================================================
+ * 						SETUP AND VERIFY CONFIGURATIONS OF ACC
+ * ================================================================================
+ */
+bool LSM303AGR_enableBDU(const LSM303AGR_t* lsm303agrStruct);
+bool LSM303AGR_setODR(const LSM303AGR_t* lsm303agrStruct, ODR_Sel_t odr);
+bool LSM303AGR_setPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t powerMode);
+bool LSM303AGR_getPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t* outMode);
 bool LSM303AGR_isXYZ_available(const LSM303AGR_t* lsm303agrStruct);
-bool LSM303AGR_XYZ_enable(const LSM303AGR_t* lsm303agrStruct);
+bool LSM303AGR_enableXYZ(const LSM303AGR_t* lsm303agrStruct);
 bool LSM303AGR_setFullScale(const LSM303AGR_t* lsm303agrStruct, FullScale_t selectFullScale);
+bool LSM303AGR_getFullScale(const LSM303AGR_t* lsm303agrStruct, FullScale_t* whichFullScale);
+
+/*
+ * ================================================================================
+ * 							GET ACCELEROMETER MEASUREMENTS
+ * ================================================================================
+ */
 bool LSM303AGR_readRawAcc(const LSM303AGR_t* lsm303agrStruct, int16_t rawAccBuf[3]);
-bool LSM303AGR_accCalibrate(const LSM303AGR_t* lsm303agrStruct,
-							int32_t sample,
-							int16_t* outX,
-							int16_t* outY,
-							int16_t* outZ,
-							int32_t* offsetX,
-							int32_t* offsetY,
-							int32_t* offsetZ);
-bool LSM303AGR_readAcc_mg(const LSM303AGR_t* lsm303agrStruct, float outAcc_XYZ[3]);
+bool LSM303AGR_accCalibrate(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, uint32_t sample);
+bool LSM303AGR_readAcc_mg(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, float outAcc_XYZ[3]);
 
 #endif /* INC_LSM303AGR_H_ */
 

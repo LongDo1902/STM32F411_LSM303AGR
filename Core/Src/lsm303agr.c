@@ -401,7 +401,7 @@ bool LSM303AGR_getTemperature(const LSM303AGR_t* lsm303agrStruct, float* outTemp
  *
  * @note	When BDU is enabled, output registers are not updated until both the LSB and MSB have beed read, ensuring coherent readings.
  */
-bool LSM303AGR_enableBDU_acc(const LSM303AGR_t* lsm303agrStruct){
+bool LSM303AGR_enableBDU(const LSM303AGR_t* lsm303agrStruct){
 	uint8_t readReg4 = 0;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG4_ACC, &readReg4)) return false;
 
@@ -412,7 +412,7 @@ bool LSM303AGR_enableBDU_acc(const LSM303AGR_t* lsm303agrStruct){
 /*
  * @brief	Configure accelerometer Output Data Rate (ODR)
  */
-bool LSM303AGR_setODR_acc(const LSM303AGR_t* lsm303agrStruct, ODR_Sel_t odr){
+bool LSM303AGR_setODR(const LSM303AGR_t* lsm303agrStruct, ODR_Sel_t odr){
 	uint8_t regVal = 0;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, &regVal)) return false;
 
@@ -502,7 +502,7 @@ bool LSM303AGR_isXYZ_available(const LSM303AGR_t* lsm303agrStruct){
 /*
  * @brief	Enablle all three accelerometer axes (X, Y, Z)
  */
-bool LSM303AGR_XYZ_enable(const LSM303AGR_t* lsm303agrStruct){
+bool LSM303AGR_enableXYZ(const LSM303AGR_t* lsm303agrStruct){
 	uint8_t val = 0;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, &val)) return false;
 
@@ -536,19 +536,19 @@ bool LSM303AGR_getFullScale(const LSM303AGR_t* lsm303agrStruct, FullScale_t* whi
 /*
  * @brief	Get sensitivity in mg/LSB according to power mode and full-scale setting
  */
-static bool getSensitivity_mgLSB(const LSM303AGR_t* lsm303agrStruct, float* outSensitivity){
+static bool getSensitivity_mgLSB(const LSM303AGR_t* lsm303agrStruct,
+								 LSM303AGR_State_t* lsm303agrState,
+								 float* outSensitivity){
 	/* Retrieve Full scale configuration */
-	FullScale_t whichFullScale;
-	if(!LSM303AGR_getFullScale(lsm303agrStruct, &whichFullScale)) return false;
+	if(!LSM303AGR_getFullScale(lsm303agrStruct, &lsm303agrState -> fullScaleSel)) return false;
 
 	/* Retrieve Power Mode configuration */
-	PowerMode_t whichPowerMode;
-	if(!LSM303AGR_getPowerMode(lsm303agrStruct, &whichPowerMode)) return false;
+	if(!LSM303AGR_getPowerMode(lsm303agrStruct, &lsm303agrState -> powerModeSel)) return false;
 
 	/* Lookup table derived from LSM303AGR datasheet */
-	switch(whichPowerMode){
+	switch(lsm303agrState -> powerModeSel){
 		case HIGH_RES_POWER_MODE:
-			switch(whichFullScale){
+			switch(lsm303agrState -> fullScaleSel){
 				case _2g: *outSensitivity = 0.98; break;
 				case _4g: *outSensitivity = 1.95; break;
 				case _8g: *outSensitivity = 3.9; break;
@@ -558,7 +558,7 @@ static bool getSensitivity_mgLSB(const LSM303AGR_t* lsm303agrStruct, float* outS
 			break;
 
 		case NORMAL_POWER_MODE:
-			switch(whichFullScale){
+			switch(lsm303agrState -> fullScaleSel){
 				case _2g: *outSensitivity = 3.9; break;
 				case _4g: *outSensitivity = 7.82; break;
 				case _8g: *outSensitivity = 15.63; break;
@@ -568,7 +568,7 @@ static bool getSensitivity_mgLSB(const LSM303AGR_t* lsm303agrStruct, float* outS
 			break;
 
 		case LOW_POWER_MODE:
-			switch(whichFullScale){
+			switch(lsm303agrState -> fullScaleSel){
 				case _2g: *outSensitivity = 15.63; break;
 				case _4g: *outSensitivity = 31.26; break;
 				case _8g: *outSensitivity = 62.52; break;
@@ -582,7 +582,39 @@ static bool getSensitivity_mgLSB(const LSM303AGR_t* lsm303agrStruct, float* outS
 }
 
 /*
- * @brief	Read raw accelerometer output (16-bit signed) from X, Y, Z axes
+ * @brief	Helper to get the expected/perfect value of accelerometer when placing the board flat
+ */
+static bool getExpectedAccVal(const LSM303AGR_t* lsm303agrStruct,
+							  LSM303AGR_State_t* lsm303agrState,
+							  int32_t* expectedAccX,
+							  int32_t* expectedAccY,
+							  int32_t* expectedAccZ){
+
+	if(!getSensitivity_mgLSB(lsm303agrStruct, lsm303agrState, &lsm303agrState -> accSensitivity)) return false;
+
+	uint8_t shiftNum = (lsm303agrState -> powerModeSel == HIGH_RES_POWER_MODE) ? 4 :
+					   (lsm303agrState -> powerModeSel == NORMAL_POWER_MODE) ? 6 : 8;
+
+	/* Count for +1g AFTER shift, then convert to RAW */
+	int32_t one_g_counts = (int32_t)lroundf(1000.0f / lsm303agrState -> accSensitivity); //e.g. 128 counts per 1g @ ±4g Normal
+	int32_t one_g_raw = one_g_counts << shiftNum;
+
+	/* Get sign of Z */
+	int16_t raw[3] ;
+	int32_t zSign = +1;
+	if(LSM303AGR_readRawAcc(lsm303agrStruct, raw)){
+		zSign = (raw[2] >= 0) ? +1 : -1;
+	}
+
+	*expectedAccX = 0;
+	*expectedAccY = 0;
+	*expectedAccZ = zSign * one_g_raw;
+
+	return true;
+}
+
+/*
+ * @brief	Read raw accelerometer output (16-bit signed) from X, Y, Z axePer
  *
  * @param	rawAccBuf	Destination buffer for raw signed data (3 elements)
  *
@@ -609,20 +641,24 @@ bool LSM303AGR_readRawAcc(const LSM303AGR_t* lsm303agrStruct, int16_t rawAccBuf[
 /*
  * @brief	Help to have a more reliable and stable value in the future
  */
-bool LSM303AGR_accCalibrate(const LSM303AGR_t* lsm303agrStruct,
-							int32_t sample,
-							int16_t* outX,
-							int16_t* outY,
-							int16_t* outZ,
-							int32_t* offsetX,
-							int32_t* offsetY,
-							int32_t* offsetZ){
+bool LSM303AGR_accCalibrate(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, uint32_t sample){
 	HAL_Delay(90); //Wait for 90ms for stable output
 
-	int16_t tempRawBuf[3]; //A temp buffer to store raw reading from Accelerometer
+	int16_t tempRawBuf[3]; //A temporary buffer to store raw reading from Accelerometer
+
 	int32_t sumAccX = 0;
 	int32_t sumAccY = 0;
 	int32_t sumAccZ = 0;
+
+	int32_t averageAccX = 0;
+	int32_t averageAccY = 0;
+	int32_t averageAccZ = 0;
+
+	int32_t expectedAccX = 0;
+	int32_t expectedAccY = 0;
+	int32_t expectedAccZ = 0;
+
+	if(!getExpectedAccVal(lsm303agrStruct, lsm303agrState, &expectedAccX, &expectedAccY, &expectedAccZ)) return false;
 
 	/* Discard 50 first samples because they are trash data */
 	for(uint16_t i = 0; i < 50; i++){
@@ -632,26 +668,35 @@ bool LSM303AGR_accCalibrate(const LSM303AGR_t* lsm303agrStruct,
 	/* Start storing valid data into xyz buffers */
 	for(uint32_t i = 0; i < sample; i++){
 		LSM303AGR_readRawAcc(lsm303agrStruct, tempRawBuf);
-		outX[i] = tempRawBuf[0];
-		outY[i] = tempRawBuf[1];
-		outZ[i] = tempRawBuf[2];
-
-		sumAccX = sumAccX + outX[i];
-		sumAccY = sumAccY + outY[i];
-		sumAccZ = sumAccZ + outZ[i];
+		sumAccX += tempRawBuf[0];
+		sumAccY += tempRawBuf[1];
+		sumAccZ += tempRawBuf[2];
 	}
 
-	*offsetX = sumAccX / sample;
-	*offsetY = sumAccY / sample;
-	*offsetZ = sumAccZ / sample;
+	/* Offset calculation for placing the board flat on the table
+	 * offset = averageRaw - expectedRaw */
+	averageAccX = sumAccX / (int32_t)sample;
+	averageAccY = sumAccY / (int32_t)sample;
+	averageAccZ = sumAccZ / (int32_t)sample;
 
+	lsm303agrState -> offsetAccX = averageAccX - expectedAccX;
+	lsm303agrState -> offsetAccY = averageAccY - expectedAccY;
+	lsm303agrState -> offsetAccZ = averageAccZ - expectedAccZ;
+
+	lsm303agrState -> isCalibrated = true; //Indicate calibration is done properly
 	return true;
 }
 
 /*
  * @brief	Get the readable/converted Accelerometer measurement.
  */
-bool LSM303AGR_readAcc_mg(const LSM303AGR_t* lsm303agrStruct, float outAcc_XYZ[3]){
+bool LSM303AGR_readAcc_mg(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, float outAcc_XYZ[3]){
+	/* Check if calibration is done, if not, start to calibrate and take 300 samples as default	 */
+	if((lsm303agrState -> isCalibrated) == false) LSM303AGR_accCalibrate(lsm303agrStruct, lsm303agrState, 200);
+	int32_t _offsetAccX = lsm303agrState -> offsetAccX;
+	int32_t _offsetAccY = lsm303agrState -> offsetAccY;
+	int32_t _offsetAccZ = lsm303agrState -> offsetAccZ;
+
 	int16_t raw[3];
 	if(!LSM303AGR_readRawAcc(lsm303agrStruct, raw)) return false;
 
@@ -661,16 +706,16 @@ bool LSM303AGR_readAcc_mg(const LSM303AGR_t* lsm303agrStruct, float outAcc_XYZ[3
 	uint8_t shiftNum = (pwMode == HIGH_RES_POWER_MODE) ? 4 : (pwMode == NORMAL_POWER_MODE) ? 6 : 8;
 
 	/* Sign preserving right bit shift */
-	raw[0] = raw[0] >> shiftNum;
-	raw[1] = raw[1] >> shiftNum;
-	raw[2] = raw[2] >> shiftNum;
+	int32_t rawCalibratedX = ((int32_t)raw[0] - _offsetAccX) >> shiftNum;
+	int32_t rawCalibratedY = ((int32_t)raw[1] - _offsetAccY) >> shiftNum;
+	int32_t rawCalibratedZ = ((int32_t)raw[2] - _offsetAccZ) >> shiftNum;
 
 	float sensitivity;
-	if(!getSensitivity_mgLSB(lsm303agrStruct, &sensitivity)) return false;
+	if(!getSensitivity_mgLSB(lsm303agrStruct, lsm303agrState, &sensitivity)) return false;
 
-	outAcc_XYZ[0] = (float)(raw[0] * sensitivity);
-	outAcc_XYZ[1] = (float)(raw[1] * sensitivity);
-	outAcc_XYZ[2] = (float)(raw[2] * sensitivity);
+	outAcc_XYZ[0] = (float)(rawCalibratedX * sensitivity);
+	outAcc_XYZ[1] = (float)(rawCalibratedY * sensitivity);
+	outAcc_XYZ[2] = (float)(rawCalibratedZ * sensitivity);
 
 	return true;
 }

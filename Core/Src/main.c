@@ -35,6 +35,19 @@ static const LSM303AGR_t lsm303agrConfig = {
 		.addrMag = LSM303AGR_I2C_ADDR_MAG //0x1EU
 };
 
+static LSM303AGR_State_t lsm303agrState = {
+	.offsetAccX = 0,
+	.offsetAccY = 0,
+	.offsetAccZ = 0,
+	.isCalibrated = false,
+
+	/* These settings are default. They will be reconfigured in main.c */
+	.ODR_sel = _10Hz,
+	.fullScaleSel = _2g,
+	.powerModeSel = NORMAL_POWER_MODE,
+	.accSensitivity = 0.0f,
+};
+
 /*
  * ===============================================================
  * 					PARAMETERS DECLARATIONS
@@ -49,9 +62,7 @@ float lsm303agr_temperature = 0.0;
 /*
  * Raw, offset and converted parameters of Accelerometer
  */
-#define CALIBRATE_SAMPLE 6
-int16_t rawAccX[CALIBRATE_SAMPLE], rawAccY[CALIBRATE_SAMPLE], rawAccZ[CALIBRATE_SAMPLE];
-int32_t offsetRawX, offsetRawY, offsetRawZ;
+#define CALIBRATE_SAMPLE 200
 float outAcc_XYZ[3];
 
 /*
@@ -68,19 +79,30 @@ int main(void){
 	(void)I2C_Init(i2cConfig); //Init CCR mode and SCL frequency
 	HAL_Delay(5); //Small delay ensure everything boot up fine before configure others
 
+	/* Check if LSM303AGR is presenting */
+	if(!LSM303AGR_isPresent(&lsm303agrConfig)) return false;
+
+	/* GREEN LED indicates device found and starts configuring */
+	for(uint8_t i = 0; i < 2; i++){
+		for(uint8_t j = 0; j < 3; j++){
+			ledControl(LED_GREEN, ON);
+			HAL_Delay(70);
+			ledControl(LED_GREEN, OFF);
+			HAL_Delay(70);
+		}
+		HAL_Delay(300);
+	}
+
 	/* Reset the sensor registers to its default values */
 	LSM303AGR_softReset(&lsm303agrConfig);
 	HAL_Delay(5);
 
 	/* Set the Output Data Rate to 400Hz */
-	if(!LSM303AGR_setODR_acc(&lsm303agrConfig, _400Hz)) return false;
+	if(!LSM303AGR_setODR(&lsm303agrConfig, _400Hz)) return false;
 	HAL_Delay(5);
 
-	/* Enable BDU and Temperature before reading temperature */
-	if(!LSM303AGR_enableBDU_acc(&lsm303agrConfig)) return false;
-	HAL_Delay(5);
-
-	if(!LSM303AGR_enableTemperature(&lsm303agrConfig)) return false;
+	/* Enable BDU */
+	if(!LSM303AGR_enableBDU(&lsm303agrConfig)) return false;
 	HAL_Delay(5);
 
 	/* Set the sensor to Normal Power Mode */
@@ -88,17 +110,28 @@ int main(void){
 	HAL_Delay(5);
 
 	/* Enabling XYZ axes */
-	if(!LSM303AGR_XYZ_enable(&lsm303agrConfig)) return false;
+	if(!LSM303AGR_enableXYZ(&lsm303agrConfig)) return false;
 	HAL_Delay(5);
 
 	/* Configure Full Scale */
 	if(!LSM303AGR_setFullScale(&lsm303agrConfig, _4g)) return false;
 	HAL_Delay(5);
 
-	if(!LSM303AGR_accCalibrate(&lsm303agrConfig, CALIBRATE_SAMPLE, rawAccX, rawAccY, rawAccZ, &offsetRawX, &offsetRawY, &offsetRawZ)) return false;
+	if(!LSM303AGR_accCalibrate(&lsm303agrConfig, &lsm303agrState, CALIBRATE_SAMPLE)) return false;
+
+	/* BLUE LED indicates the configuring completed */
+	for(uint8_t i = 0; i < 2; i++){
+		for(uint8_t j = 0; j < 3; j++){
+			ledControl(LED_BLUE, ON);
+			HAL_Delay(70);
+			ledControl(LED_BLUE, OFF);
+			HAL_Delay(70);
+		}
+		HAL_Delay(300);
+	}
 
 	while(1){
-		if(!LSM303AGR_readAcc_mg(&lsm303agrConfig, outAcc_XYZ)) return false;
-		HAL_Delay(100);
+		if(!LSM303AGR_readAcc_mg(&lsm303agrConfig, &lsm303agrState, outAcc_XYZ)) return false;
+		HAL_Delay(250);
 	}
 }
