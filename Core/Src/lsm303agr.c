@@ -710,12 +710,11 @@ bool LSM303AGR_readAcc_mg(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t*
 	int32_t rawCalibratedY = ((int32_t)raw[1] - _offsetAccY) >> shiftNum;
 	int32_t rawCalibratedZ = ((int32_t)raw[2] - _offsetAccZ) >> shiftNum;
 
-	float sensitivity;
-	if(!getSensitivity_mgLSB(lsm303agrStruct, lsm303agrState, &sensitivity)) return false;
+	if(!getSensitivity_mgLSB(lsm303agrStruct, lsm303agrState, &lsm303agrState -> accSensitivity)) return false;
 
-	outAcc_XYZ[0] = (float)(rawCalibratedX * sensitivity);
-	outAcc_XYZ[1] = (float)(rawCalibratedY * sensitivity);
-	outAcc_XYZ[2] = (float)(rawCalibratedZ * sensitivity);
+	outAcc_XYZ[0] = (float)(rawCalibratedX * lsm303agrState -> accSensitivity);
+	outAcc_XYZ[1] = (float)(rawCalibratedY * lsm303agrState -> accSensitivity);
+	outAcc_XYZ[2] = (float)(rawCalibratedZ * lsm303agrState -> accSensitivity);
 
 	return true;
 }
