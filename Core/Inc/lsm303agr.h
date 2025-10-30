@@ -141,6 +141,14 @@
 #define	REG1_ACC_LPEN_Pos		3
 #define REG1_ACC_ODR_Pos		4
 
+/* CTRL_REG2_ACC */
+#define REG2_ACC_HPIS1_Pos		0
+#define REG2_ACC_HPIS2_Pos		1
+#define REG2_ACC_HPCLICK_Pos	2
+#define REG2_ACC_FDS_Pos		3
+#define REG2_ACC_HPCF_Pos		4
+#define REG2_ACC_HPM_Pos		6
+
 /* CTRL_REG4_ACC */
 #define REG4_ACC_SPI_EN_Pos		0
 #define REG4_ACC_ST_Pos			1
@@ -301,6 +309,28 @@ typedef enum{
 	Z_OVERRUN,
 	XYZ_OVERRUN
 }XYZ_Status_t;
+
+/*
+ * ==========================================================
+ * 				HIGH-PASS CONFIGURATION STRUCT
+ * ==========================================================
+ */
+typedef enum{
+	HPM_NORMAL_REF_RESET = 0x00, //0b00
+	HPM_REFERENCE_SIGNAL = 0x01, //0b01
+	HPM_NORMAL_NO_RESET = 0X02, //0b10
+	HPM_AUTORESET_INT = 0x03 //0b11
+}HighPassMode_t;
+
+typedef enum{
+	HP_DATA_BYPASS,
+	HP_DATA_OUTREG_FIFO
+}FDS_t;
+
+typedef struct{
+	uint16_t ODR_HZ;
+	float CUTOFF_HZ[4];
+}HPFRow_t;
 
 /*
  * ======================================================================

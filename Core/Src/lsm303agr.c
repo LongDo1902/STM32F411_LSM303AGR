@@ -90,17 +90,48 @@ static const RegSpan_t magSpan[] = {
  * 			 INTERNAL WRITE AND READ FUNCTIONS OF ACCELEROMETER
  * ===========================================================================
  */
-/* Write a single accelerometer register */
+/*
+ * @brief	Write a single Accelerometer register.
+ *
+ * @param	lsm303agrStruct		Pointer to device descriptor
+ * @param	regAddr				The desired LSM303AGR Accelerometer register to write
+ * @param	value				A byte-value to write into @p regAddr
+ *
+ * @retVal	true	if I2C transaction succeeded
+ * 			false	if I2C transaction failed
+ */
 static inline bool writeAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t regAddr, uint8_t value){
 	return I2C_writeReg8(lsm303agrStruct -> i2c, lsm303agrStruct -> addrAcc, regAddr, value);
 }
 
-/* Read a single accelerometer register */
+/*
+ * @brief	Read a single byte from Accelerometer register.
+ *
+ * @param	lsm303agrStruct		Pointer to device descriptor
+ * @param	regAddr				The desired LSM303AGR Accelerometer register to read from
+ * @param	outResult			Output pointer to receive the read byte (non-NULL)
+ *
+ * @retVal	true	On successful I2C read and non-NULL @p outResult
+ * 			false	On I2C error
+ */
 static inline bool readAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t regAddr, uint8_t* outResult){
 	return I2C_readReg8(lsm303agrStruct -> i2c, lsm303agrStruct -> addrAcc, regAddr, outResult);
 }
 
-/* Write multiple consecutive accelerometer registers */
+/*
+ * @brief	Multi-write helps to write a list of byte-values to the corresponding Accelerometer registers
+ * 			Write multiple byte-values to multiple accelerometer registers in one burst using auto-increment address.
+ *
+ * @param	lsm303agrStruct		Pointer to device descriptor
+ * @param	startRegAddr		First accelerometer register address to write
+ * @param	dataBuf				Data buffer stores byte-values to write
+ * @param	quantityOfReg		Number of bytes/registers to write.
+ *
+ * @retVal	true	On successful burst write.
+ * 			false	On I2C error.
+ *
+ * @note	Auto-increment is enabled only when @p quantityOfReg > 1
+ */
 static inline bool multiWriteAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t startRegAddr, const uint8_t* dataBuf, uint16_t quantityOfReg){
 	uint8_t isIncrement = (quantityOfReg > 1) ? LSM303AGR_ADDR_AUTO_INC : 0u;
 	return I2C_writeBurst(lsm303agrStruct -> i2c, lsm303agrStruct -> addrAcc, startRegAddr, isIncrement, dataBuf, quantityOfReg);
@@ -732,3 +763,174 @@ bool LSM303AGR_readAcc_mg(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t*
 
 	return true;
 }
+
+/*
+ * ========================================================================
+ * 					HIGH-PASS FILTER CONFIGURATION
+ * ========================================================================
+ */
+/*
+ * @brief	An internal helper that retrieves the selected high-pass mode
+ */
+bool LSM303AGR_getHighPassMode(const LSM303AGR_t* lsm303agrStruct, HighPassMode_t* whichHighPassMode){
+	if(!lsm303agrStruct || !whichHighPassMode) return false;
+	uint8_t val = 0u;
+	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG2_ACC, &val)) return false;
+	*whichHighPassMode = (HighPassMode_t) ((val >> REG2_ACC_HPM_Pos) & 0x3u);
+	return true;
+}
+
+/*
+ * @brief	Set high-pass filter mode (HPM1: HPM0)
+ * @param	highPassMode	enum of type HighPassMode_t
+ * @note	Automatically clears and writes only HPM bits.
+ */
+bool LSM303AGR_setHighPassMode(const LSM303AGR_t* lsm303agrStruct, HighPassMode_t highPassMode){
+	if(!lsm303agrStruct) return false;
+	uint8_t regVal = 0u;
+	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG2_ACC, &regVal)) return false;
+
+	HighPassMode_t currentHighPassMode = (HighPassMode_t)((regVal >> REG2_ACC_HPM_Pos) & 0x3u);
+	if(currentHighPassMode == highPassMode) return true;
+
+	regVal = (uint8_t)((regVal & ~(0x3u << REG2_ACC_HPM_Pos)) | ((uint8_t)highPassMode << REG2_ACC_HPM_Pos));
+	return writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG2_ACC, regVal);
+}
+
+/*
+ * @brief	Get output data register type
+ */
+bool LSM303AGR_getFDS(const LSM303AGR_t* lsm303agrStruct, FDS_t* outFDS){
+	if(!lsm303agrStruct || !outFDS) return false;
+
+	uint8_t regVal = 0;
+	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG2_ACC, &regVal)) return false;
+	*outFDS = (regVal & (1u << REG2_ACC_FDS_Pos)) ? HP_DATA_OUTREG_FIFO : HP_DATA_BYPASS;
+	return true;
+}
+
+/*
+ * @brief	Select output data register type
+ * @note	FDS = 1 routes the filted data to output registers and FIFO
+ * 			FDS = 0 bypasses the internal HPF for output data
+ */
+bool LSM303AGR_setFDS(const LSM303AGR_t* lsm303agrStruct, FDS_t selectFDS){
+	uint8_t regVal = 0u;
+	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG2_ACC, &regVal)) return false;
+
+	regVal = (uint8_t)((regVal & ~(0x1u << REG2_ACC_FDS_Pos)) | ((uint8_t)selectFDS << REG2_ACC_FDS_Pos));
+	return writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG2_ACC, regVal);
+}
+
+/*
+ *
+ */
+static const HPFRow_t hpRows[] = {
+		{1, {0.02f, 0.008f, 0.004f, 0.002f} },
+		{10, {0.20f, 0.080f, 0.040f, 0.020f} },
+		{25, {0.50f, 0.200f, 0.100f, 0.050f} },
+		{50, {1.00f, 0.500f, 0.200f, 0.100f} },
+		{100, {2.00f, 1.000f, 0.500f, 0.200f} },
+		{200, {4.00f, 2.000f, 1.000f, 0.500f} },
+		{400, {8.00f, 4.000f, 2.000f, 1.000f} },
+};
+
+/*
+ * @brief	A helper converts ODR_Sel_t enum to Hz - a real number in Hz
+ */
+static uint16_t odr_to_hz(ODR_Sel_t odr){
+	switch(odr){
+		case _1HZ: return 1; //1Hz
+		case _10Hz: return 10; //10Hz
+		case _25Hz: return 25; //25Hz
+		case _50Hz: return 50; //50Hz
+		case _100Hz: return 100; //100Hz
+		case _200Hz: return 200; //200Hz
+		case _400Hz: return 400; //400Hz
+		case _1K620Hz: return 1620; //1620Hz
+		case _1344HR_5376LP: return 1344; //1344Hz for HR/Normal power mode, and 5376Hz is for Low Power
+		default: return 0;
+	}
+}
+
+/*
+ * @brief	A private helper to get the exact row from hpRows[]
+ */
+static bool getExactRow(uint16_t odr_hz, const HPFRow_t** outRow){
+	if(!odr_hz || !outRow) return false; //NULL check
+	/* Pick the matched row */
+	for(size_t i = 0; i < ARRLEN(hpRows); i++){
+		if(hpRows[i].ODR_HZ == odr_hz){
+			*outRow = &hpRows[i];
+			return true;
+		}
+	}
+	return false; //No exact match
+}
+
+/*
+ * @brief A helper to write the desired cutoff frequency to the bit 4 and 5 of register CTRL_REG2_ACC
+ */
+static bool LSM303AGR_writeDesiredCutoffFreq(const LSM303AGR_t* lsm303agrStruct,
+										   uint8_t idx_desiredCutoffFreq){
+	if(!lsm303agrStruct) return false;
+	if(idx_desiredCutoffFreq > 3u) return false; // only 4 choices
+
+	uint8_t reg2 = 0;
+	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG2_ACC, &reg2)) return false;
+
+	/* Clear HPCF [5:4], then set it to idx_desiredCutoffFreq */
+	reg2 = (uint8_t)((reg2 & ~(0x3u << REG2_ACC_HPCF_Pos)) | ((idx_desiredCutoffFreq & 0x3u) << REG2_ACC_HPCF_Pos));
+	return writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG2_ACC, reg2);
+}
+
+/*
+ * @brief	A function sets the high pass cut off frequency
+ * @param	desiredCutoffFreq	This should be stay between....
+ */
+bool LSM303AGR_setHPCutoffFreq(const LSM303AGR_t* lsm303agrStruct,
+							  const LSM303AGR_State_t* lsm303agrState,
+							  float desiredCutoffFreq){
+	/* Check if the pointers are NULL  */
+	if(!lsm303agrStruct || !lsm303agrState) return false;
+
+	/* Convert from ODR_Sel_t value type to a uint16_t value  */
+	/* Pick the exact match high-pass filter row based on ODR profile */
+	uint16_t odr_hz = odr_to_hz(lsm303agrState -> ODR_sel);
+	const HPFRow_t* row = NULL;
+	if(!getExactRow(odr_hz, &row)) return false;
+
+	/* Choose the HPCF index whose frequency cutoff is closed to desired */
+	uint8_t bestCutoff_idx = 0; //0 means idx = 0 assume the first CUTOFF_HZ[0] is the best match at the initial
+	float bestCutoff_error = fabsf(desiredCutoffFreq - row -> CUTOFF_HZ[0]); //fabsf = float absolute value which remove sign from a float number
+	/* Loop throught the remaining 3 cutoff frequencies (idx 1 to 3) */
+	for(uint8_t i = 1; i < 4; i++){
+		float errorEachOption = fabsf(desiredCutoffFreq - row -> CUTOFF_HZ[i]); //Calculate absolute difference for each option
+		if(errorEachOption < bestCutoff_error){
+			bestCutoff_error = errorEachOption;
+			bestCutoff_idx = i; //Store the index of CUTOFF_HZ that has the best match to the requested cutoff frequency
+		}
+	}
+	return LSM303AGR_writeDesiredCutoffFreq(lsm303agrStruct, bestCutoff_idx);
+}
+
+
+
+
+
+///*
+// * ========================================================================
+// * 					ACTIVITY AND INACTIVITY FUNCTION
+// * ========================================================================
+// */
+//static bool setActivationThresholdAcc(const LSM303AGR_t* lsm303agrStruct){
+//	if(lsm303agrStruct == NULL) return false;
+//
+//}
+
+
+
+
+
+
+
