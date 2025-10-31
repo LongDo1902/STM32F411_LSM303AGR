@@ -185,7 +185,7 @@
  */
 typedef enum{
 	POWER_DOWN_MODE = 0x0,
-	_1HZ = 0x1,
+	_1Hz = 0x1,
 	_10Hz = 0x2,
 	_25Hz = 0x3,
 	_50Hz = 0x4,

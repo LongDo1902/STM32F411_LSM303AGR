@@ -137,7 +137,18 @@ static inline bool multiWriteAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t sta
 	return I2C_writeBurst(lsm303agrStruct -> i2c, lsm303agrStruct -> addrAcc, startRegAddr, isIncrement, dataBuf, quantityOfReg);
 }
 
-/* Read multiple consecutive accelerometer registers */
+/*
+ * @brief	Read multiple consecutive accelerometer registers in one burst
+ * 			Uses auto-increment addressing when reading more than one byte
+ *
+ * @param	lsm303agrStruct		Pointer to device descriptor
+ * @param	startRegAddr		First Accelerometer register address to be read
+ * @param	quantityOfReg		Number of registers to read
+ * @param	outResultBuf		Output buffer to store the read bytes (non-NULL)
+ *
+ * @retVal	true	On successful burst read.
+ * 			false	On I2C error.
+ */
 static inline bool multiReadAcc(const LSM303AGR_t* lsm303agrStruct, uint8_t startRegAddr, uint16_t quantityOfReg, uint8_t* outResultBuf){
 	uint8_t isIncrement = (quantityOfReg > 1) ? LSM303AGR_ADDR_AUTO_INC : 0u;
 	return I2C_readBurst(lsm303agrStruct -> i2c, lsm303agrStruct -> addrAcc, startRegAddr, isIncrement, quantityOfReg, outResultBuf);
@@ -213,44 +224,54 @@ bool LSM303AGR_multiReadMag(const LSM303AGR_t* lsm303agrStruct, uint8_t startReg
 }
 
 /*
- * ==========================================================
- * 					DEVICE IDENTIFICATION
- * ==========================================================
+ * ========================================================================
+ * 							DEVICE IDENTIFICATION
+ * ========================================================================
  */
-/* @brief	Read WHO_AM_I register for both Accelerometer and Magnetometer */
+/*
+ * @brief	read WHO_AM_I for accel and mag
+ *
+ * @param	lsm303agrStruct		Device descriptor (non-NULL)
+ * @param	whoAcc				Output: Accelerometer ID (expect 0x33)
+ * @param	whoMag				Output:	Magnetometer ID (expect 0x40)
+ */
 bool LSM303AGR_whoAmI(const LSM303AGR_t* lsm303agrStruct, uint8_t* whoAcc, uint8_t* whoMag){
 	if((lsm303agrStruct == NULL) || (whoAcc == NULL) || (whoMag == NULL)) return false;
-
-	/* Accelerometer WHO_AM_I_ACC @ 0x0F should be 0x33 */
 	if(!readAcc(lsm303agrStruct, LSM303AGR_WHO_AM_I_ACC, whoAcc)) return false;
-
-	/* Magnetometer WHO_AM_I_MAG @ 0x4F should be 0x40 */
 	if(!readMag(lsm303agrStruct, LSM303AGR_WHO_AM_I_MAG, whoMag)) return false;
 	return true;
 }
 
-/* @brief	Check whether both sub-devices respond with the correct ID values */
+/*
+ * @brief	Check device presence by validating WHO_AM_I values
+ *
+ * @param	lsm303agrStruct		Device descriptor (non-NULL)
+ * @retVal	true	if ACC = 0x33 and MAG = 0x40
+ * 			false	otherwise or on read error
+ */
 bool LSM303AGR_isPresent(const LSM303AGR_t* lsm303agrStruct){
 	uint8_t whoAcc = 0u;
 	uint8_t whoMag = 0u;
 	if(!LSM303AGR_whoAmI(lsm303agrStruct, &whoAcc, &whoMag)) return false;
-
-	/* Expect IDs: ACC = 0x33 & MAG = 0x40 */
 	return ((whoAcc == LSM303AGR_WHO_AM_I_ACC_VAL) &&
 			(whoMag == LSM303AGR_WHO_AM_I_MAG_VAL));
 }
 
 /*
- * ==========================================================
- * 				REBOOT AND RESET BOTH SENSORS
- * ==========================================================
+ * =================================================================================
+ * 							REBOOT AND RESET BOTH SENSORS
+ * =================================================================================
  */
 /*
  * @brief	Reboot the accelerometer memory (reload factory trim values).
  * 			This command reinitializes factory calibration data but does NOT reset user-accessible registers.
+ *
+ * @param	lsm303agrStruct		Pointer to device descriptor
+ * @retVal 	true	if reboot command succeeded
+ * 			false	I2C error
  */
 static bool rebootAcc(const LSM303AGR_t* lsm303agrStruct){
-	/* Assign regVal to the current value in register CTRL_REG5 */
+	/* Assign regVal to the current value/setting in register CTRL_REG5 */
 	uint8_t regVal = 0;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG5_ACC, &regVal)) return false;
 
@@ -258,13 +279,14 @@ static bool rebootAcc(const LSM303AGR_t* lsm303agrStruct){
 	regVal |= (1u << REG5_ACC_BOOT_Pos);
 	if(!writeAcc(lsm303agrStruct, LSM303AGR_CTRL_REG5_ACC, regVal)) return false;
 
-	HAL_Delay(50); //Allow time for reboot process to complete
+	HAL_Delay(50); //Wait for reboot completion
 	return true;
 }
 
 /*
  * @brief	Reboot the magnetometer memory (reload factory trim values).
  * 			Like rebootAcc, this command does not affect user registers.
+ * 			Similar to rebootAcc but applies to the magnetometer block
  */
 static bool rebootMag(const LSM303AGR_t* lsm303agrStruct){
 	/* Assign regVal to the current values in register CFG_REG_A_MAG */
@@ -275,7 +297,7 @@ static bool rebootMag(const LSM303AGR_t* lsm303agrStruct){
 	regVal |= (1u << REG_A_REBOOT_Pos);
 	if(!writeMag(lsm303agrStruct, LSM303AGR_CFG_REG_A_MAG, regVal)) return false;
 
-	HAL_Delay(50); //Allow time for reboot process to complete
+	HAL_Delay(50); //Wait for reboot completion
 	return true;
 }
 
@@ -302,14 +324,14 @@ static bool restoreMagDefaults(const LSM303AGR_t* lsm303agrStruct){
 
 	for(size_t i = 0; i < ARRLEN(magSpan); i++){
 		if(!multiWriteMag(lsm303agrStruct, magSpan[i].startReg, p, magSpan[i].len)) return false;
-		p += magSpan[i].len;
+		p += magSpan[i].len; //Advance pointer to the next data segment in LSM303AGR_magDefault array
 	}
 	return true;
 }
 
 /*
- * @brief	Perform a full chip soft reset (via magnetometer CFG_REG_A)
- * 			Sets the SOFT_RST bit to reset both Accel and Mag internal logic and registers.
+ * @brief	Activate global soft reset for both sensors ACC and MAG
+ * 			Sets the SOFT_RST bit in magnetometer CFG_REG_A to reset both accelerometer and magnetometer internal logic and registers
  */
 static bool activateSoftReset(const LSM303AGR_t* lsm303agrStruct){
 	uint8_t regVal = 0;
@@ -342,9 +364,9 @@ bool LSM303AGR_softReset(const LSM303AGR_t* lsm303agrStruct){
 }
 
 /*
- * =================================================================
- * 			   			TEMPERATURE CONTROL
- * =================================================================
+ * ======================================================================================
+ * 			   						TEMPERATURE CONTROL
+ * ======================================================================================
  */
 /*
  * @brief	Disable the internal temperature sensor of the accelerometer block
@@ -373,7 +395,8 @@ bool LSM303AGR_enableTemperature(const LSM303AGR_t* lsm303agrStruct){
 /*
  * @brief	Read and convert raw temperature data to degrees Celcius
  *
- * @param	outTempC	Pointer to store computed temperature in C
+ * @param	lsm303agrStruct		Pointer to device descriptor
+ * @param	outTempC			Pointer to store computed temperature in C
  *
  * @note	Conversion method depends on the current power mode:
  * 				- Low Power Mode: 8-bit resolution
@@ -388,7 +411,7 @@ bool LSM303AGR_getTemperature(const LSM303AGR_t* lsm303agrStruct, float* outTemp
 
 	if((lsm303agrStruct == NULL) || (outTempC == NULL)) return false;
 
-	/* Identify the current power mode for correct scaling */
+	/* Identify the current power mode to select proper scaling */
 	PowerMode_t currentMode;
 	if(!LSM303AGR_getPowerMode(lsm303agrStruct, &currentMode)) return false;
 
@@ -396,7 +419,7 @@ bool LSM303AGR_getTemperature(const LSM303AGR_t* lsm303agrStruct, float* outTemp
 	uint8_t temperatureBuf[2];
 	if(!multiReadAcc(lsm303agrStruct, LSM303AGR_OUT_TEMP_L_ACC, sizeof(temperatureBuf), temperatureBuf)) return false;
 
-	/* Decode temperature values based on power mode */
+	/* Decode temperature based on power mode */
 	switch(currentMode){
 		case LOW_POWER_MODE:
 			//Use the 8-bit formula for Low-Power mode
@@ -423,14 +446,14 @@ bool LSM303AGR_getTemperature(const LSM303AGR_t* lsm303agrStruct, float* outTemp
 }
 
 /*
- * ===============================================================
- * 						MISCELLANEOUS
- * ===============================================================
+ * ==================================================================================================
+ * 										   MISCELLANEOUS
+ * ==================================================================================================
  */
 /*
  * @brief	Enable Block Data Update (BDU) for consistent 16-bit data reads.
- *
- * @note	When BDU is enabled, output registers are not updated until both the LSB and MSB have beed read, ensuring coherent readings.
+ *			When BDU is enabled, output registers are not updated until both the LSB and MSB have beed read.
+ * 			This prevents mismatched data when reading multi-byte values
  */
 bool LSM303AGR_enableBDU(const LSM303AGR_t* lsm303agrStruct){
 	uint8_t readReg4 = 0;
@@ -442,6 +465,12 @@ bool LSM303AGR_enableBDU(const LSM303AGR_t* lsm303agrStruct){
 
 /*
  * @brief	Configure accelerometer Output Data Rate (ODR)
+ * 			Update the ODR bits [7:4] in CTRL_REG1_ACC to set the sampling rate
+ * 			Also stores the selected value into the driver state struct (lsm303agrState)
+ *
+ * @param	lsm303agrStruct		Pointer to device descriptor
+ * @param	lsm303agrState		Pointer to runtime state structure
+ * @param	odr					Desired ODR selection from ODR_Sel_t enum
  */
 bool LSM303AGR_setODR(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, ODR_Sel_t odr){
 	uint8_t regVal = 0;
@@ -459,7 +488,13 @@ bool LSM303AGR_setODR(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm
 }
 
 /*
- * @brief	Configure accelerometer power mode (Low, Normal, or High-Res)
+ * @brief	Configure accelerometer power mode (Low, Normal, or High-Resolution)
+ * 			Sets or clears the LPen and HR bits in CTRL_REG1_ACC and CTRL_REG4_ACC
+ * 			according to the desired power mode. Also updates state flags.
+ *
+ * @param	lsm303agrStruct		Pointer to device descriptor
+ * @param	lsm303agrState		Pointer to runtime state struct to save important configurations
+ * @param	powerMode			Target power mode (LOW_POWER_MODE, NORMAL_POWER_MODE, HIGH_RES_POWER_MODE)
  *
  * @note	LPen (CTRL_REG1) enables Low Power Mode
  * 			HR (CTRL_REG4) enables High-Res Mode
@@ -507,11 +542,13 @@ bool LSM303AGR_setPowerMode(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_
 
 /*
  * @brief	Retrieve the currently active power mode
+ * 			Reads LPen and HR bits to determine which power mode is currently active
+ *
+ * @param	lsm303agrStruct		Pointer to device descriptor
+ * @param	outMode				Output pointer stores detected power mode
  */
 bool LSM303AGR_getPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t* outMode){
-	if(lsm303agrStruct == NULL || outMode == NULL){
-		return false;
-	}
+	if(lsm303agrStruct == NULL || outMode == NULL) return false;
 
 	uint8_t valReg1 = 0;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG1_ACC, &valReg1)) return false;
@@ -530,12 +567,48 @@ bool LSM303AGR_getPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t* out
 }
 
 /*
- * ========================================================================
- * 						READ ACCELEROMETER MEASUREMENT
- * ========================================================================
+ * @brief	Returns mg per LSB based on current full-scale setting
+ *
+ * @param	lsm303agrStruct		Pointer to the device descriptor
+ * @param	lsm303agrState		Pointer to the driver state.
+ * @param	out_mgPerLSB		Pointer store the addr of output "ms per LSB"
+ */
+static bool get_mgPerLSB_acc(const LSM303AGR_t* lsm303agrStruct,
+							 const LSM303AGR_State_t* lsm303agrState,
+							 float* out_mgPerLSB){
+	if(!lsm303agrStruct || !lsm303agrState || !out_mgPerLSB) return false;
+
+	/* Initial declare fs as 2g */
+	FullScale_t fs = _2g;
+	if(lsm303agrState -> fullScaleSel){ //Check if there is full-scale value stored in state structure
+		fs = lsm303agrState -> fullScaleSel;
+	}
+	else{
+		if(!LSM303AGR_getFullScale(lsm303agrStruct, &fs)) return false; //Otherwise, get the current full-scale
+	}
+
+	float steps = 128.0f;
+
+	switch(fs){
+		case _2g: *out_mgPerLSB = 2000.0f / steps; break;
+		case _4g: *out_mgPerLSB = 4000.0f / steps; break;
+		case _8g: *out_mgPerLSB = 8000.0f / steps; break;
+		case _16g: *out_mgPerLSB = 16000.0f / steps; break;
+		default: return false;
+	}
+	return true;
+}
+
+/*
+ * ================================================================================================
+ * 									READ ACCELEROMETER MEASUREMENT
+ * ================================================================================================
  */
 /*
  * @brief	Check if new accelerometer XYZ data is available
+ * 			Read STATUS_REG_ACC and checks the XYZDA (bit 3) flag
+ *
+ * @param	lsm303agrStruct		Pointer to the device descriptor
  */
 bool LSM303AGR_isXYZ_available(const LSM303AGR_t* lsm303agrStruct){
 	uint8_t val = 0;
@@ -546,6 +619,9 @@ bool LSM303AGR_isXYZ_available(const LSM303AGR_t* lsm303agrStruct){
 
 /*
  * @brief	Enablle all three accelerometer axes (X, Y, Z)
+ *
+ * 			Set bits [2:0] in CTRL_REG1_ACC to enable all axes
+ * @param	lsm303agrStruct		Pointer to the device descriptor
  */
 bool LSM303AGR_enableXYZ(const LSM303AGR_t* lsm303agrStruct){
 	uint8_t val = 0;
@@ -558,6 +634,11 @@ bool LSM303AGR_enableXYZ(const LSM303AGR_t* lsm303agrStruct){
 
 /*
  * @brief	Configure full-scale range (±2g, ±4g, ±8g, or ±16g)
+ * 			Update FS bits [5:4] in CTRL_REG4_ACC and saves the selection to lsm303agrState
+ *
+ * @param	lsm303agrStruct		Pointer to the device descriptor
+ * @param	lsm303agrState		Pointer to the driver state structure
+ * @param	selectFullScale		Target full-scale value (FullScale_t enum)
  */
 bool LSM303AGR_setFullScale(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, FullScale_t selectFullScale){
 	uint8_t val = 0;
@@ -575,7 +656,11 @@ bool LSM303AGR_setFullScale(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_
 }
 
 /*
- * @brief	Retrieve currently configured full-scale range
+ * @brief	Retrieve the currently configured full-scale range
+ * 			Read FS bits [5:4] from CTRL_REG4_ACC
+ *
+ * @param	lsm303agrStruct		Pointer to device descriptor
+ * @param	whichFullScale		Output pointer to store the current scale
  */
 bool LSM303AGR_getFullScale(const LSM303AGR_t* lsm303agrStruct, FullScale_t* whichFullScale){
 	uint8_t val = 0;
@@ -586,7 +671,12 @@ bool LSM303AGR_getFullScale(const LSM303AGR_t* lsm303agrStruct, FullScale_t* whi
 }
 
 /*
- * @brief	Get sensitivity in mg/LSB according to power mode and full-scale setting
+ * @brief	Get sensitivity (mg/LSB) according to power mode and full-scale setting
+ * 			Looks up the conversion factor from datasheet tables.
+ *
+ * @param	lsm303agrStruct		Pointer to device descriptor
+ * @param	lsm303agrState		Pointer to state (must contain powerModeSel and fullScaleSel)
+ * @param	outSensitivity		Output pointer to store mg/LSB factor (float)
  */
 static bool getSensitivity_mgLSB(const LSM303AGR_t* lsm303agrStruct,
 								 LSM303AGR_State_t* lsm303agrState,
@@ -630,7 +720,10 @@ static bool getSensitivity_mgLSB(const LSM303AGR_t* lsm303agrStruct,
 }
 
 /*
- * @brief	Helper to get the expected/perfect value of accelerometer when placing the board flat
+ * @brief	Compute expected raw accelerometer values when the board is flat
+ * 			Calculates theoretical +1g on Z-axis and 0g on X and Y for use in calibration
+ *
+ * @param	expectedAccX/Y/Z	Output expected raw counts for each axis.
  */
 static bool getExpectedAccVal(const LSM303AGR_t* lsm303agrStruct,
 							  LSM303AGR_State_t* lsm303agrState,
@@ -662,11 +755,10 @@ static bool getExpectedAccVal(const LSM303AGR_t* lsm303agrStruct,
 }
 
 /*
- * @brief	Read raw accelerometer output (16-bit signed) from X, Y, Z axePer
+ * @brief	Read raw accelerometer output (16-bit signed) as signed 16-bit values.
+ * 			Waits for new data, then reads 6 consecutive output bytes (X/Y/Z LSB_MSB)
  *
- * @param	rawAccBuf	Destination buffer for raw signed data (3 elements)
- *
- * @note	Function waits until new data is available before reading.
+ * @param	rawAccBuf	Pointer to array of 3 int16_t for output
  */
 bool LSM303AGR_readRawAcc(const LSM303AGR_t* lsm303agrStruct, int16_t rawAccBuf[3]){
 	if(lsm303agrStruct == NULL) return false;
@@ -687,7 +779,10 @@ bool LSM303AGR_readRawAcc(const LSM303AGR_t* lsm303agrStruct, int16_t rawAccBuf[
 }
 
 /*
- * @brief	Help to have a more reliable and stable value in the future
+ * @brief	Perform accelerometer calibration (offset correction)
+ * 			Computes offsets by averaging multiple samples while the boards is flat
+ *
+ * @param	sample	Number of samples to average
  */
 bool LSM303AGR_accCalibrate(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, uint32_t sample){
 	HAL_Delay(90); //Wait for 90ms for stable output
@@ -736,7 +831,12 @@ bool LSM303AGR_accCalibrate(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_
 }
 
 /*
- * @brief	Get the readable/converted Accelerometer measurement.
+ * @brief	Read and convert accelerometer data to mg (milli-g)
+ * 			Applies calibration offsets and sensitivity scaling to raw data
+ *
+ * @param	outAcc_XYZ	Output array [X,Y,Z] in mg
+ *
+ * @note	Performs auto-calibration if not yet done.
  */
 bool LSM303AGR_readAcc_mg(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, float outAcc_XYZ[3]){
 	if((!lsm303agrState -> isPowerModeSet) || (!lsm303agrState -> isFullScaleSet)) return false;
@@ -764,13 +864,19 @@ bool LSM303AGR_readAcc_mg(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t*
 	return true;
 }
 
+
 /*
  * ========================================================================
  * 					HIGH-PASS FILTER CONFIGURATION
  * ========================================================================
  */
 /*
- * @brief	An internal helper that retrieves the selected high-pass mode
+ * @brief	Retrieve the currently selected high-pass filter mode (HPM1:HPM0)
+ * 			Reads CTRL_REG2_ACC bits [1:0] and decodes the active high-pass filter mode
+ *
+ * @param	lsm303agrStruct		Pointer to device descriptor
+ * @param	whichHighPassMode	Output pointer to store the mode
+ *
  */
 bool LSM303AGR_getHighPassMode(const LSM303AGR_t* lsm303agrStruct, HighPassMode_t* whichHighPassMode){
 	if(!lsm303agrStruct || !whichHighPassMode) return false;
@@ -782,8 +888,10 @@ bool LSM303AGR_getHighPassMode(const LSM303AGR_t* lsm303agrStruct, HighPassMode_
 
 /*
  * @brief	Set high-pass filter mode (HPM1: HPM0)
- * @param	highPassMode	enum of type HighPassMode_t
- * @note	Automatically clears and writes only HPM bits.
+ * 			Update only the high-pass mode bits in CTRL_REG2_ACC
+ * 			Automatically skip the write if the mode is already set.
+ *
+ * @param	highPassMode	Desired mode (enum HighPassMode_t)
  */
 bool LSM303AGR_setHighPassMode(const LSM303AGR_t* lsm303agrStruct, HighPassMode_t highPassMode){
 	if(!lsm303agrStruct) return false;
@@ -798,7 +906,11 @@ bool LSM303AGR_setHighPassMode(const LSM303AGR_t* lsm303agrStruct, HighPassMode_
 }
 
 /*
- * @brief	Get output data register type
+ * @brief	Get current output data register path (filtered or bypassed)
+ * 			Reads FDS bit in CTRL_REG2_ACC to determine whether the high-pass filter output is routed
+ * 			to the data registers/FIFO.
+ *
+ * @param	outFDS	Output pointer to store FDS setting (HP_DATA_OUTREG_FIFO or HP_DATA_BYPASS)
  */
 bool LSM303AGR_getFDS(const LSM303AGR_t* lsm303agrStruct, FDS_t* outFDS){
 	if(!lsm303agrStruct || !outFDS) return false;
@@ -811,8 +923,10 @@ bool LSM303AGR_getFDS(const LSM303AGR_t* lsm303agrStruct, FDS_t* outFDS){
 
 /*
  * @brief	Select output data register type
- * @note	FDS = 1 routes the filted data to output registers and FIFO
- * 			FDS = 0 bypasses the internal HPF for output data
+ * @note	FDS = 1 -> routes the filted data to output registers and FIFO
+ * 			FDS = 0 -> filter bypassed (raw data sent to output)
+ *
+ * @param	selectFDS	Target mode from FDS_t enum
  */
 bool LSM303AGR_setFDS(const LSM303AGR_t* lsm303agrStruct, FDS_t selectFDS){
 	uint8_t regVal = 0u;
@@ -823,7 +937,8 @@ bool LSM303AGR_setFDS(const LSM303AGR_t* lsm303agrStruct, FDS_t selectFDS){
 }
 
 /*
- *
+ * @brief	Lookup table of cutoff frequencies (Hz) for each ODR and HPCF combination
+ *			Each row corresponds to one Output Data Rate (ODR), containing the available cutoff frequencies for HPCF = 0...3
  */
 static const HPFRow_t hpRows[] = {
 		{1, {0.02f, 0.008f, 0.004f, 0.002f} },
@@ -836,11 +951,14 @@ static const HPFRow_t hpRows[] = {
 };
 
 /*
- * @brief	A helper converts ODR_Sel_t enum to Hz - a real number in Hz
+ * @brief	Convert ODR_Set_t enum value to frequency in Hz
+ *
+ * @param	odr	ODR	selection enum
+ * @return	Sampling rate in Hz, or 0 if invalid
  */
 static uint16_t odr_to_hz(ODR_Sel_t odr){
 	switch(odr){
-		case _1HZ: return 1; //1Hz
+		case _1Hz: return 1; //1Hz
 		case _10Hz: return 10; //10Hz
 		case _25Hz: return 25; //25Hz
 		case _50Hz: return 50; //50Hz
@@ -854,7 +972,10 @@ static uint16_t odr_to_hz(ODR_Sel_t odr){
 }
 
 /*
- * @brief	A private helper to get the exact row from hpRows[]
+ * @brief	Find matching cutoff-frequecy row for a given ODR
+ *
+ * @param	odr_hz	ODR in Hz
+ * @param	outRow 	Output pointer to matched row (from hpRows)
  */
 static bool getExactRow(uint16_t odr_hz, const HPFRow_t** outRow){
 	if(!odr_hz || !outRow) return false; //NULL check
@@ -869,13 +990,17 @@ static bool getExactRow(uint16_t odr_hz, const HPFRow_t** outRow){
 }
 
 /*
- * @brief A helper to write the desired cutoff frequency to the bit 4 and 5 of register CTRL_REG2_ACC
+ * @brief	Write desired high-pass cutoff frequency index into CTRL_REG2_ACC
+ * 			Updates HPCF bits [5:4] based on selected index (0-3)
+ *
+ * @param	idx_desiredCutoffFreq	Index 0...3 for cutoff frequency
  */
 static bool LSM303AGR_writeDesiredCutoffFreq(const LSM303AGR_t* lsm303agrStruct,
 										   uint8_t idx_desiredCutoffFreq){
 	if(!lsm303agrStruct) return false;
 	if(idx_desiredCutoffFreq > 3u) return false; // only 4 choices
 
+	/* Retrieve the current byte value in CTRL_REG2_ACC and assign to reg2 */
 	uint8_t reg2 = 0;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_CTRL_REG2_ACC, &reg2)) return false;
 
@@ -885,12 +1010,17 @@ static bool LSM303AGR_writeDesiredCutoffFreq(const LSM303AGR_t* lsm303agrStruct,
 }
 
 /*
- * @brief	A function sets the high pass cut off frequency
- * @param	desiredCutoffFreq	This should be stay between....
+ * @brief	Set high-pass cutoff frequency closet to a desired value
+ * 			Finds the HPCF index whose frequency is closet to the requested cutoff
+ * 			(based on current ODR). Then writes that index into CTRL_REG2_ACC
+ *
+ * @param	desiredCutoffFreq	This should be stay between....!!!!!!!!!!!!!!!!!!!!!!!!!
+ *
+ * @note	The available cutoff frequencies depend on the selected ODR
  */
 bool LSM303AGR_setHPCutoffFreq(const LSM303AGR_t* lsm303agrStruct,
-							  const LSM303AGR_State_t* lsm303agrState,
-							  float desiredCutoffFreq){
+							   LSM303AGR_State_t* lsm303agrState,
+							   float desiredCutoffFreq){
 	/* Check if the pointers are NULL  */
 	if(!lsm303agrStruct || !lsm303agrState) return false;
 
@@ -914,20 +1044,57 @@ bool LSM303AGR_setHPCutoffFreq(const LSM303AGR_t* lsm303agrStruct,
 	return LSM303AGR_writeDesiredCutoffFreq(lsm303agrStruct, bestCutoff_idx);
 }
 
+/*
+ * =======================================================================================
+ * 								ACTIVITY AND INACTIVITY FUNCTION
+ * =======================================================================================
+ */
+/*
+ * ACT_THS_A	0x3E	Activity Threshold defines how strong the acceleration must be to trigger "active" state
+ * ACT_DUR_A	0x3F	Activity Duration defines how long the acceleration must stay below ACT_THS to be considered "inactive"
+ * mg/LSB		How much physical acceleration in milli-g corresponds to one digital count in that register
+ */
 
+bool setActThsAcc(const LSM303AGR_t* lsm303agrStruct,
+				  LSM303AGR_State_t* lsm303agrState,
+				  int32_t desired_mgActThs){
+	/* Check NULL */
+	if(!lsm303agrStruct || !lsm303agrState) return false;
 
+	/* Obtain milli-g per LSB */
+	float mgPerLSB = 0.0f;
+	if(!get_mgPerLSB_acc(lsm303agrStruct, lsm303agrState, &mgPerLSB)) return false;
+	if(mgPerLSB <= 0.0f) return false;
 
+	/* Compute the digital count for ACT_THS and round it to the nearest integer*/
+	int digitalCountActThs = (int)lroundf((float)desired_mgActThs / mgPerLSB);
 
-///*
-// * ========================================================================
-// * 					ACTIVITY AND INACTIVITY FUNCTION
-// * ========================================================================
-// */
-//static bool setActivationThresholdAcc(const LSM303AGR_t* lsm303agrStruct){
-//	if(lsm303agrStruct == NULL) return false;
-//
-//}
+	/* Clamp to 7-bits field [6:0] */
+	if(digitalCountActThs < 0) digitalCountActThs = 0;
+	if(digitalCountActThs > 0x7Fu) digitalCountActThs = 0x7Fu;
 
+	/* Write digitalCountActThs to the actual register (ACT_THS_A) */
+	uint8_t regVal;
+	if(!readAcc(lsm303agrStruct, LSM303AGR_ACT_THS_ACC, &regVal)) return false;
+	regVal = (uint8_t)((regVal & ~0x7Fu) | (uint8_t)(digitalCountActThs)); // Clear the existing value in the register before writting a new value
+
+	return writeAcc(lsm303agrStruct, LSM303AGR_ACT_THS_ACC, regVal);
+}
+
+bool setActDurAcc(const LSM303AGR_t* lsm303agrStruct,
+				  LSM303AGR_State_t* lsm303agrState,
+				  uint32_t desiredActDur){
+	if(!lsm303agrStruct || !lsm303agrState) return false;
+
+	ODR_Sel_t odr = lsm303agrState -> ODR_sel;
+	odr_to_hz(odr);
+	uint8_t digitalTimeCount = (uint8_t)((desiredActDur * odr - 1) / 8); //This formula according to datasheet
+
+	uint8_t regVal;
+	if(!readAcc(lsm303agrStruct, LSM303AGR_ACT_DUR_ACC, &regVal)) return false;
+	regVal = (uint8_t)((regVal & ~0xFFu) | (digitalTimeCount));
+	return writeAcc(lsm303agrStruct, LSM303AGR_ACT_DUR_ACC, regVal);
+}
 
 
 
