@@ -447,7 +447,7 @@ bool LSM303AGR_getTemperature(const LSM303AGR_t* lsm303agrStruct, float* outTemp
 
 /*
  * ==================================================================================================
- * 										   MISCELLANEOUS
+ * 								SETUP AND VERIFY CONFIGURATIONS OF ACC
  * ==================================================================================================
  */
 /*
@@ -1055,6 +1055,17 @@ bool LSM303AGR_setHPCutoffFreq(const LSM303AGR_t* lsm303agrStruct,
  * mg/LSB		How much physical acceleration in milli-g corresponds to one digital count in that register
  */
 
+/*
+ * @brief	Set Activity Threshold for inactivity and activity detection feature
+ * 			This threshold defines the minimum acceleration change (in mg) that must
+ * 			be exceeded to consider the device as active.
+ * 			If the measured-acceleration-change is below this threshold for a duration
+ * 			defined by @p desiredActDur, the device is considered inactive.
+ *
+ * @param	lsm303agrStruct		Pointer to device description
+ * @param	lsm303agrState		Pointer to the sensor state
+ * @param	desired_mgActThs	Desired Activity Threshold in milli-g (mg)
+ */
 bool setActThsAcc(const LSM303AGR_t* lsm303agrStruct,
 				  LSM303AGR_State_t* lsm303agrState,
 				  int32_t desired_mgActThs){
@@ -1081,22 +1092,33 @@ bool setActThsAcc(const LSM303AGR_t* lsm303agrStruct,
 	return writeAcc(lsm303agrStruct, LSM303AGR_ACT_THS_ACC, regVal);
 }
 
+/*
+ * @brief	Set Activity Duration for inactivity and activity feature
+ * 			When the acceleration becomes lower than @p desired_mgActThs,
+ * 			at a certain duration @p desiredActDur, ACC considered to be inactive.
+ * @param	lsm303agrStruct		Pointer to device description
+ * @param	lsm303agrState		Pointer to the sensor state
+ * @param	desiredActDur		Desired inactivity duraction in seconds
+ */
 bool setActDurAcc(const LSM303AGR_t* lsm303agrStruct,
 				  LSM303AGR_State_t* lsm303agrState,
-				  uint32_t desiredActDur){
+				  float desiredActDur){
 	if(!lsm303agrStruct || !lsm303agrState) return false;
 
-	ODR_Sel_t odr = lsm303agrState -> ODR_sel;
-	odr_to_hz(odr);
-	uint8_t digitalTimeCount = (uint8_t)((desiredActDur * odr - 1) / 8); //This formula according to datasheet
+	/* Retrieve the current Output Data Rate & and convert ODR to Hz */
+	const uint16_t odr_hz = odr_to_hz(lsm303agrState -> ODR_sel);
+
+	/* Compute register code with proper rounding */
+	float digitalTimeCount = (float)((desiredActDur * (float)odr_hz - 1.0f) / 8.0f); //This formula according to datasheet
+	int roundedDigitialTimeCount = (int)roundf(digitalTimeCount);
+	if(roundedDigitialTimeCount < 0) return false;
+	if(roundedDigitialTimeCount > 255) return false;
 
 	uint8_t regVal;
 	if(!readAcc(lsm303agrStruct, LSM303AGR_ACT_DUR_ACC, &regVal)) return false;
-	regVal = (uint8_t)((regVal & ~0xFFu) | (digitalTimeCount));
+	regVal = (uint8_t)((regVal & ~0xFFu) | (roundedDigitialTimeCount));
 	return writeAcc(lsm303agrStruct, LSM303AGR_ACT_DUR_ACC, regVal);
 }
-
-
 
 
 

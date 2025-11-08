@@ -381,22 +381,37 @@ bool LSM303AGR_enableBDU(const LSM303AGR_t* lsm303agrStruct);
 bool LSM303AGR_setODR(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, ODR_Sel_t odr);
 bool LSM303AGR_setPowerMode(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, PowerMode_t powerMode);
 bool LSM303AGR_getPowerMode(const LSM303AGR_t* lsm303agrStruct, PowerMode_t* outMode);
-bool LSM303AGR_isXYZ_available(const LSM303AGR_t* lsm303agrStruct);
-bool LSM303AGR_enableXYZ(const LSM303AGR_t* lsm303agrStruct);
-bool LSM303AGR_setFullScale(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, FullScale_t selectFullScale);
-bool LSM303AGR_getFullScale(const LSM303AGR_t* lsm303agrStruct, FullScale_t* whichFullScale);
 
 /*
  * ================================================================================
  * 							GET ACCELEROMETER MEASUREMENTS
  * ================================================================================
  */
+bool LSM303AGR_isXYZ_available(const LSM303AGR_t* lsm303agrStruct);
+bool LSM303AGR_enableXYZ(const LSM303AGR_t* lsm303agrStruct);
+bool LSM303AGR_setFullScale(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, FullScale_t selectFullScale);
+bool LSM303AGR_getFullScale(const LSM303AGR_t* lsm303agrStruct, FullScale_t* whichFullScale);
 bool LSM303AGR_readRawAcc(const LSM303AGR_t* lsm303agrStruct, int16_t rawAccBuf[3]);
 bool LSM303AGR_accCalibrate(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, uint32_t sample);
 bool LSM303AGR_readAcc_mg(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, float outAcc_XYZ[3]);
 
+/*
+ * ================================================================================
+ * 							HIGH-PASS FILTER CONFIGURATION
+ * ================================================================================
+ */
+bool LSM303AGR_getHighPassMode(const LSM303AGR_t* lsm303agrStruct, HighPassMode_t* whichHighPassMode);
+bool LSM303AGR_setHighPassMode(const LSM303AGR_t* lsm303agrStruct, HighPassMode_t highPassMode);
+bool LSM303AGR_getFDS(const LSM303AGR_t* lsm303agrStruct, FDS_t* outFDS);
+bool LSM303AGR_setFDS(const LSM303AGR_t* lsm303agrStruct, FDS_t selectFDS);
+bool LSM303AGR_setHPCutoffFreq(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, float desiredCutoffFreq);
+
+/*
+ * ================================================================================
+ * 							ACTIVITY AND INACTIVITY FUNCTION
+ * ================================================================================
+ */
+bool setActThsAcc(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, int32_t desired_mgActThs);
+bool setActDurAcc(const LSM303AGR_t* lsm303agrStruct, LSM303AGR_State_t* lsm303agrState, uint32_t desiredActDur);
+
 #endif /* INC_LSM303AGR_H_ */
-
-
-
-
